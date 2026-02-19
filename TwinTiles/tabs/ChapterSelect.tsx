@@ -1,6 +1,7 @@
 import {View, Text, TouchableOpacity, StyleSheet} from "react-native"
 import { FlatList } from "react-native-gesture-handler"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { useNavigation } from "@react-navigation/native"
 
 type Chapter = {
   id: string,
@@ -15,13 +16,17 @@ const chapters: Chapter[] = [
 ]
 
 export default function ChapterSelect(){
+  
+  const navigation = useNavigation<any>()
+
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
       data={chapters}
       keyExtractor={(item) => item.id}
       renderItem={({item}) => (
-        <TouchableOpacity style={styles.chapterItem}>
+        <TouchableOpacity style={styles.chapterItem}
+        onPress={() => navigation.navigate("LevelModal", {chapterTitle: item.title})}>
           <Text style={styles.chapterText}>{item.title}</Text>
         </TouchableOpacity>
       )}
