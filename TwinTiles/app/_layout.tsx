@@ -1,15 +1,9 @@
-import {Tabs} from 'expo-router'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import {Stack} from 'expo-router'
 
-export default function TabLayout(){
-    return(
-        <Tabs>
-            <Tabs.Screen
-            name='index'
-            options={{
-                title: 'Home',
-                tabBarIcon: ({color}) => <MaterialIcons size={28} name='house' color={color}/>
-            }}/>
-        </Tabs>
+export default function Layout(){
+    return (
+        <Stack>
+            <Stack.Screen name='(tabs)' options={{headerShown: false}}/>
+        </Stack>
     )
 }
