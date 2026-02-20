@@ -43,10 +43,16 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   chapterItem: {
-    backgroundColor: "#f2f2f2",
-    padding: 20,
+    backgroundColor: "#ffff",
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     borderRadius: 12,
     marginBottom: 15,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   chapterText: {
     fontSize: 18,

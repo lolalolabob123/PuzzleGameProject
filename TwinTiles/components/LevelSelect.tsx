@@ -1,45 +1,78 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { LevelModalProps } from "../navigation/types";
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  View,
+  FlatList,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import PuzzleBoard from "./PuzzleBoard";
 
-type RootStackParamList = {
-  Main: undefined;
-  LevelModal: { chapterTitle: string };
-};
-
-type Props = NativeStackScreenProps<RootStackParamList, "LevelModal">;
-
-export default function LevelSelect({ route, navigation }: Props) {
-  const { chapterTitle } = route.params;
-
-  const levels = ["Level 1", "Level 2", "Level 3", "Level 4"];
+export default function LevelSelect({
+  route,
+  navigation,
+}: LevelModalProps) {
+  const levels = [1, 2, 3, 4, 5, 6, 7, 8];
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>{chapterTitle} - Level 1</Text>
+      <Text style={styles.title}>
+        {route.params.chapterTitle}
+      </Text>
 
-      <PuzzleBoard size={4} />
-
-      <TouchableOpacity
-        style={[styles.levelButton, { backgroundColor: "#ccc" }]}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.levelText}>Back</Text>
-      </TouchableOpacity>
+      <FlatList
+        data={levels}
+        keyExtractor={(item) => item.toString()}
+        contentContainerStyle={styles.listContainer}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.levelButton}
+            onPress={() => {
+              navigation.goBack();
+              navigation.navigate("Game", {
+                chapter: route.params.chapterTitle,
+                level: item,
+              });
+            }}
+          >
+            <Text style={styles.levelText}>
+              Level {item}
+            </Text>
+          </TouchableOpacity>
+        )}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  title: { fontSize: 20, fontWeight: "bold", marginBottom: 20 },
-  levelButton: {
-    padding: 15,
-    borderRadius: 12,
-    marginTop: 20,
-    width: 200,
-    alignItems: "center",
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
-  levelText: { fontSize: 16, fontWeight: "600" },
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    marginVertical: 20,
+    textAlign: "center",
+  },
+  listContainer: {
+    paddingBottom: 40,
+  },
+  levelButton: {
+    backgroundColor: "#ffff",
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 15,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  levelText: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
 });
