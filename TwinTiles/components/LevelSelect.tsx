@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import PuzzleBoard from "./PuzzleBoard";
 
 type RootStackParamList = {
   Main: undefined;
@@ -12,25 +13,19 @@ type Props = NativeStackScreenProps<RootStackParamList, "LevelModal">;
 export default function LevelSelect({ route, navigation }: Props) {
   const { chapterTitle } = route.params;
 
-  const levels = ["Level 1", "Level 2", "Level 3"];
+  const levels = ["Level 1", "Level 2", "Level 3", "Level 4"];
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Select a Level for {chapterTitle}</Text>
-      {levels.map((level) => (
-        <TouchableOpacity
-          key={level}
-          style={styles.levelButton}
-          onPress={() => alert(`Starting ${level} of ${chapterTitle}`)}
-        >
-          <Text style={styles.levelText}>{level}</Text>
-        </TouchableOpacity>
-      ))}
+      <Text style={styles.title}>{chapterTitle} - Level 1</Text>
+
+      <PuzzleBoard size={4} />
+
       <TouchableOpacity
         style={[styles.levelButton, { backgroundColor: "#ccc" }]}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.levelText}>Cancel</Text>
+        <Text style={styles.levelText}>Back</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -38,12 +33,11 @@ export default function LevelSelect({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  title: { fontSize: 20, fontWeight: "bold", marginBottom: 30, textAlign: "center" },
+  title: { fontSize: 20, fontWeight: "bold", marginBottom: 20 },
   levelButton: {
-    backgroundColor: "#f2f2f2",
     padding: 15,
     borderRadius: 12,
-    marginBottom: 15,
+    marginTop: 20,
     width: 200,
     alignItems: "center",
   },
