@@ -12,7 +12,7 @@ export default function LevelSelect({
   route,
   navigation,
 }: LevelModalProps) {
-  const levels = [1, 2, 3, 4, 5, 6, 7, 8];
+  const levels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   return (
     <SafeAreaView style={styles.container}>
