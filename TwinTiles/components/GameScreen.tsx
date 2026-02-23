@@ -1,7 +1,7 @@
 import { GameScreenProps } from "../navigation/types";
 import {Text, StyleSheet} from 'react-native'
 import { SafeAreaView } from "react-native-safe-area-context"
-import PuzzleBoard from "./PuzzleBoard";
+import PuzzleBoard, {level1_4x4} from "./PuzzleBoard";
 import { chapters } from "../data/chapters";
 
   function getGridSize(level: number){
@@ -9,7 +9,6 @@ import { chapters } from "../data/chapters";
       4 + Math.floor((level - 1) / 5)
     )
   }
-
   
 
 export default function GameScreen({ route }: GameScreenProps) {
@@ -22,7 +21,7 @@ export default function GameScreen({ route }: GameScreenProps) {
       <Text style={styles.title}>
         {chapter} - Level {level}
       </Text>
-      <PuzzleBoard size={gridSize} />
+      <PuzzleBoard size={4} levelData={level1_4x4} />
     </SafeAreaView>
   );
 }

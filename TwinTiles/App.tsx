@@ -7,6 +7,7 @@ import LevelSelect from "./components/LevelSelect";
 import GameScreen from './components/GameScreen'
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RootStackParamList, TabParamList } from "./navigation/types";
+import { FontAwesome } from "@expo/vector-icons";
 
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -14,7 +15,24 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 function Tabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof FontAwesome.glyphMap = "circle";
+
+          if (route.name === "Home") {
+            iconName = focused ? "home" : "home";
+          } else if (route.name === "Chapters") {
+            iconName = focused ? "th-large" : "th-large";
+          }
+
+          return <FontAwesome name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: "#4dabf7",
+        tabBarInactiveTintColor: "gray",
+      })}
+    >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Chapters" component={ChapterSelect} />
     </Tab.Navigator>
@@ -30,7 +48,8 @@ export default function App() {
             <RootStack.Screen
               name="Main"
               component={Tabs}
-              options={{ headerShown: false }}
+              options={{ headerShown: false,  }}
+              
             />
           </RootStack.Group>
           <RootStack.Group screenOptions={{ presentation: "modal" }}>

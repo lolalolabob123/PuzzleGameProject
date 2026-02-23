@@ -1,4 +1,4 @@
-import {View, Text, TouchableOpacity, StyleSheet} from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
 import { FlatList } from "react-native-gesture-handler"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useNavigation } from "@react-navigation/native"
@@ -6,31 +6,37 @@ import { useNavigation } from "@react-navigation/native"
 type Chapter = {
   id: string,
   title: string,
+  color: string,
 }
 
 const chapters: Chapter[] = [
-  {id: '1', title: 'Chapter 1'},
-  {id: '2', title: 'Chapter 2'},
-  {id: '3', title: 'Chapter 3'},
-  {id: '4', title: 'Chapter 4'},
+  { id: '1', title: 'Chapter 1', color: "#42eb20" },
+  { id: '2', title: 'Chapter 2', color: "#f7f308" },
+  { id: '3', title: 'Chapter 3', color: "#eb9e11" },
+  { id: '4', title: 'Chapter 4', color: "#d41919" },
 ]
 
-export default function ChapterSelect(){
-  
+export default function ChapterSelect() {
+
   const navigation = useNavigation<any>()
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-      data={chapters}
-      keyExtractor={(item) => item.id}
-      renderItem={({item}) => (
-        <TouchableOpacity style={styles.chapterItem}
-        onPress={() => navigation.navigate("LevelModal", {chapterTitle: item.title})}>
-          <Text style={styles.chapterText}>{item.title}</Text>
-        </TouchableOpacity>
-      )}
-      contentContainerStyle={styles.listContent}/>
+        data={chapters}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={styles.chapterItem}
+            onPress={() => navigation.navigate("LevelModal", { chapterTitle: item.title })}>
+            <Text style={styles.chapterText}>{item.title}</Text>
+            <View
+              style={[
+                styles.chapterAccent,
+                { backgroundColor: item.color }
+              ]}></View>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.listContent} />
     </SafeAreaView>
   )
 }
@@ -57,5 +63,13 @@ const styles = StyleSheet.create({
   chapterText: {
     fontSize: 18,
     fontWeight: "600",
+  },
+  chapterAccent: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 8,
+    height: 6,
+    borderRadius: 4,
   },
 });
