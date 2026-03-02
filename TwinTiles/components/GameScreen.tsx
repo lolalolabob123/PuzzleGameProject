@@ -16,12 +16,15 @@ export default function GameScreen({ route }: GameScreenProps) {
 
   const gridSize = getGridSize(level)
 
+  const chapterData = chapters[Number(chapter)]
+  const levelData = chapterData.levels[level - 1].grid
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>
         {chapter} - Level {level}
       </Text>
-      <PuzzleBoard size={4} levelData={level1_4x4} />
+      <PuzzleBoard size={4} levelData={levelData} />
     </SafeAreaView>
   );
 }

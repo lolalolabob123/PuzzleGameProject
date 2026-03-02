@@ -1,4 +1,14 @@
-export const chapters = {
+type Level = {
+  id: number
+  grid: number[]
+}
+
+type Chapter = {
+  title: string
+  levels: Level[]
+}
+
+export const chapters: Record<number, Chapter> = {
   1: {
     title: "Chapter 1",
     levels: [

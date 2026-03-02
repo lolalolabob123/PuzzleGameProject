@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Modal } from "react-native"
 import { useState, useEffect } from "react"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { chapters } from "../data/chapters"
 
 export type PuzzleBoardProps = {
   size?: number
