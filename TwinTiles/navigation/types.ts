@@ -10,11 +10,11 @@ export type TabParamList = {
 export type RootStackParamList = {
   Main: NavigatorScreenParams<TabParamList>;
   Game: {
-    chapter: string;
+    chapterId: number;
     level: number;
   };
   LevelModal: {
-    chapterTitle: string;
+    chapterId: number;
   };
 };
 

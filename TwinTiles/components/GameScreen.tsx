@@ -1,43 +1,46 @@
-import { GameScreenProps } from "../navigation/types";
-import {Text, StyleSheet} from 'react-native'
+import { GameScreenProps } from "../navigation/types"
+import { Text, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import PuzzleBoard, {level1_4x4} from "./PuzzleBoard";
-import { chapters } from "../data/chapters";
+import PuzzleBoard from "../components/PuzzleBoard"
+import { chapters } from "../data/chapters"
+import { useResponsive } from "../utils/responsive"
 
-  function getGridSize(level: number){
-    return (
-      4 + Math.floor((level - 1) / 5)
-    )
-  }
-  
+function getGridSize(level: number) {
+  return level <= 5 ? 4 : 6
+}
 
 export default function GameScreen({ route }: GameScreenProps) {
-  const { chapter, level } = route.params;
+  const { chapterId, level } = route.params
+  const { scale } = useResponsive()
 
   const gridSize = getGridSize(level)
 
-  const chapterData = chapters[Number(chapter)]
+  const chapterData = chapters[chapterId]
   const levelData = chapterData.levels[level - 1].grid
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>
-        {chapter} - Level {level}
+      <Text
+        style={[styles.title, { fontSize: 20 * scale }]}
+        maxFontSizeMultiplier={1.2}
+      >
+        Chapter {chapterId} - Level {level}
       </Text>
-      <PuzzleBoard size={4} levelData={levelData} />
+
+      <PuzzleBoard size={gridSize} levelData={levelData} />
     </SafeAreaView>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
-    padding: 20,
+    justifyContent: "center",
+    paddingHorizontal: 20,
   },
   title: {
-    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 20,
   },
-});
+})

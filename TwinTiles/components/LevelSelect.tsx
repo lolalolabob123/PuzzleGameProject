@@ -7,17 +7,19 @@ import {
   FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { chapters } from "../data/chapters";
 
 export default function LevelSelect({
   route,
   navigation,
 }: LevelModalProps) {
-  const levels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const levels = chapters[route.params.chapterId].levels
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>
-        {route.params.chapterTitle}
+        {`Chapter ${route.params.chapterId}`}
       </Text>
 
       <FlatList
@@ -30,13 +32,13 @@ export default function LevelSelect({
             onPress={() => {
               navigation.goBack();
               navigation.navigate("Game", {
-                chapter: route.params.chapterTitle,
-                level: item,
+                chapterId: route.params.chapterId,
+                level: item.id,
               });
             }}
           >
             <Text style={styles.levelText}>
-              Level {item}
+              Level {item.id}
             </Text>
           </TouchableOpacity>
         )}

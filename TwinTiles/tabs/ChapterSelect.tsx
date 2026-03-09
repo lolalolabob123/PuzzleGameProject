@@ -27,7 +27,7 @@ export default function ChapterSelect() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.chapterItem}
-            onPress={() => navigation.navigate("LevelModal", { chapterTitle: item.title })}>
+            onPress={() => navigation.navigate("LevelModal", { chapterId: Number(item.id) })}>
             <Text style={styles.chapterText}>{item.title}</Text>
             <View
               style={[
