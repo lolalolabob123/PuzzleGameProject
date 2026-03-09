@@ -27,7 +27,12 @@ export default function GameScreen({ route }: GameScreenProps) {
         Chapter {chapterId} - Level {level}
       </Text>
 
-      <PuzzleBoard size={gridSize} levelData={levelData} />
+      <PuzzleBoard
+  size={gridSize}
+  levelData={levelData}
+  chapterId={chapterId}
+  level={level}
+/>
     </SafeAreaView>
   )
 }

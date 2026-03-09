@@ -7,47 +7,77 @@ import {
 } from "react-native"
 import { useState, useEffect, useMemo } from "react"
 import { SafeAreaView } from "react-native-safe-area-context"
+
 import { calculateBoardLayout } from "../utils/boardLayout"
+import { unlockNextLevel } from "../utils/progress"
 
 export type PuzzleBoardProps = {
   size?: number
   levelData?: number[]
+  chapterId: number
+  level: number
 }
 
-export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
+export default function PuzzleBoard({
+  size = 4,
+  levelData,
+  chapterId,
+  level,
+}: PuzzleBoardProps) {
 
   const { boardSize, cellSize } = calculateBoardLayout(size)
 
+  const [cells, setCells] = useState<number[]>([])
   const [modalVisible, setModalVisible] = useState(false)
-  const [cells, setCells] = useState<number[]>(Array(size * size).fill(0))
 
+  /**
+   * Locked cells (cells pre-filled in levelData)
+   * Using Set instead of Array for faster lookup
+   */
   const lockedIndexes = useMemo(() => {
-    if (!levelData) return []
+    if (!levelData) return new Set<number>()
 
-    return levelData
-      .map((value, index) => (value !== 0 ? index : null))
-      .filter((v): v is number => v !== null)
+    return new Set(
+      levelData
+        .map((value, index) => (value !== 0 ? index : null))
+        .filter((v): v is number => v !== null)
+    )
   }, [levelData])
 
+  /**
+   * Reset board when level loads
+   */
   useEffect(() => {
     setCells(levelData ?? Array(size * size).fill(0))
   }, [size, levelData])
 
+  /**
+   * Cycle cell value
+   */
   const cycleCell = (index: number) => {
-    if (lockedIndexes.includes(index)) return
+    if (lockedIndexes.has(index)) return
 
     setCells(prev => {
       const updated = [...prev]
       updated[index] = (updated[index] + 1) % 3
 
-      if (checkWin(updated)) {
-        setModalVisible(true)
-      }
-
       return updated
     })
   }
 
+  /**
+   * Watch board for win condition
+   */
+  useEffect(() => {
+    if (checkWin(cells)) {
+      unlockNextLevel(chapterId, level)
+      setModalVisible(true)
+    }
+  }, [cells])
+
+  /**
+   * Cell colors
+   */
   const getBackgroundColor = (value: number) => {
     switch (value) {
       case 1:
@@ -58,6 +88,10 @@ export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
         return "#ffffff"
     }
   }
+
+  /**
+   * Helpers
+   */
 
   const isBoardFull = (board: number[]) =>
     board.every(cell => cell !== 0)
@@ -81,9 +115,14 @@ export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
     return false
   }
 
+  /**
+   * Win condition check
+   */
   const checkWin = (board: number[]) => {
+    if (board.length === 0) return false
     if (!isBoardFull(board)) return false
 
+    // Check rows
     for (let row = 0; row < size; row++) {
       const rowData = board.slice(row * size, row * size + size)
 
@@ -92,6 +131,7 @@ export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
       }
     }
 
+    // Check columns
     for (let col = 0; col < size; col++) {
       const colData: number[] = []
 
@@ -108,7 +148,10 @@ export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, alignItems: "center" }}>
+    <SafeAreaView style={styles.container}>
+
+      {/* WIN MODAL */}
+
       <Modal transparent animationType="fade" visible={modalVisible}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -120,9 +163,12 @@ export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
             >
               <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
+
           </View>
         </View>
       </Modal>
+
+      {/* BOARD */}
 
       <View
         style={[
@@ -133,32 +179,45 @@ export default function PuzzleBoard({ size = 4, levelData }: PuzzleBoardProps) {
           },
         ]}
       >
-        {cells.map((value, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.cell,
-              {
-                width: cellSize,
-                height: cellSize,
-                borderWidth: size >= 8 ? 0.5 : 1,
-                backgroundColor: getBackgroundColor(value),
-                opacity: lockedIndexes.includes(index) ? 0.6 : 1,
-              },
-            ]}
-            onPress={() => cycleCell(index)}
-          >
-            <Text style={{ fontSize: cellSize * 0.35 }}>
-              {value !== 0 ? value : ""}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {cells.map((value, index) => {
+
+          const isLocked = lockedIndexes.has(index)
+
+          return (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.cell,
+                {
+                  width: cellSize,
+                  height: cellSize,
+                  borderWidth: size >= 8 ? 0.5 : 1,
+                  backgroundColor: getBackgroundColor(value),
+                  opacity: isLocked ? 0.6 : 1,
+                },
+              ]}
+              onPress={() => cycleCell(index)}
+            >
+              <Text style={{ fontSize: cellSize * 0.35 }}>
+                {value !== 0 ? value : ""}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
       </View>
+
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
+
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   board: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -166,17 +225,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: "hidden",
   },
+
   cell: {
     justifyContent: "center",
     alignItems: "center",
     borderColor: "#999",
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
+
   modalContent: {
     backgroundColor: "#fff",
     padding: 30,
@@ -184,19 +246,23 @@ const styles = StyleSheet.create({
     width: "80%",
     alignItems: "center",
   },
+
   modalTitle: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
   },
+
   modalButton: {
     backgroundColor: "#4dabf7",
     paddingVertical: 10,
     paddingHorizontal: 25,
     borderRadius: 8,
   },
+
   modalButtonText: {
     color: "#fff",
     fontWeight: "bold",
   },
+
 })
