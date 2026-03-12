@@ -11,30 +11,16 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<TabParamList>;
   Game: {
     chapterId: number;
-    level: number;
+    levelId: number; // Changed from 'level' to 'levelId' to match your LevelSelect code
   };
   LevelModal: {
     chapterId: number;
   };
 };
 
+// Prop Helpers
+export type HomeScreenProps = BottomTabScreenProps<TabParamList, "Home">;
+export type ChapterSelectProps = BottomTabScreenProps<TabParamList, "Chapters">;
 
-export type HomeScreenProps = BottomTabScreenProps<
-  TabParamList,
-  "Home"
->;
-
-export type ChapterSelectProps = BottomTabScreenProps<
-  TabParamList,
-  "Chapters"
->;
-
-export type LevelModalProps = NativeStackScreenProps<
-  RootStackParamList,
-  "LevelModal"
->;
-
-export type GameScreenProps = NativeStackScreenProps<
-  RootStackParamList,
-  "Game"
->;
+export type LevelModalProps = NativeStackScreenProps<RootStackParamList, "LevelModal">;
+export type GameScreenProps = NativeStackScreenProps<RootStackParamList, "Game">;

@@ -1,80 +1,80 @@
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { FontAwesome } from "@expo/vector-icons";
+
+// Import your new shared type
 import { LevelModalProps } from "../navigation/types";
-import {
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  View,
-  FlatList,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { getChapterProgress } from "../utils/progress";
 import { chapters } from "../data/chapters";
 
-export default function LevelSelect({
-  route,
-  navigation,
-}: LevelModalProps) {
+export default function LevelSelectScreen({ navigation, route }: LevelModalProps) {
+  const chapterId = route.params?.chapterId ?? 1;
+  const [unlockedLevel, setUnlockedLevel] = useState(1);
 
-const levels = chapters[route.params.chapterId].levels
+  useEffect(() => {
+    const loadProgress = async () => {
+      const reached = await getChapterProgress(chapterId);
+      setUnlockedLevel(reached);
+    };
+    loadProgress();
+  }, [chapterId]);
+
+  const currentChapter = chapters[chapterId];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>
-        {`Chapter ${route.params.chapterId}`}
-      </Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>{currentChapter.title}</Text>
 
-      <FlatList
-        data={levels}
-        keyExtractor={(item) => item.toString()}
-        contentContainerStyle={styles.listContainer}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.levelButton}
-            onPress={() => {
-              navigation.goBack();
-              navigation.navigate("Game", {
-                chapterId: route.params.chapterId,
-                level: item.id,
-              });
-            }}
-          >
-            <Text style={styles.levelText}>
-              Level {item.id}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
-    </SafeAreaView>
+      <View style={styles.levelGrid}>
+        {currentChapter.levels.map((lvl) => {
+          const isLocked = lvl.id > unlockedLevel;
+
+          return (
+            <TouchableOpacity
+              key={lvl.id}
+              disabled={isLocked}
+              style={[
+                styles.levelButton,
+                isLocked ? styles.levelLocked : styles.levelUnlocked
+              ]}
+              onPress={() => {
+                console.log("Navigating to level:", lvl.id);
+                navigation.navigate("Game", { // <--- Changed this line
+                  levelId: lvl.id,
+                  chapterId: chapterId
+                });
+              }}
+            >
+              {isLocked ? (
+                <FontAwesome name="lock" size={24} color="#adb5bd" />
+              ) : (
+                <Text style={styles.levelText}>{lvl.id}</Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    marginVertical: 20,
-    textAlign: "center",
-  },
-  listContainer: {
-    paddingBottom: 40,
-  },
+  container: { padding: 20, alignItems: 'center' },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20 },
+  levelGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   levelButton: {
-    backgroundColor: "#ffff",
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginBottom: 15,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    width: 70,
+    height: 70,
+    margin: 10,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
     elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
-  levelText: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
+  levelUnlocked: { backgroundColor: '#4dabf7' },
+  levelLocked: { backgroundColor: '#e9ecef', borderWidth: 1, borderColor: '#dee2e6' },
+  levelText: { color: 'white', fontSize: 22, fontWeight: 'bold' },
 });

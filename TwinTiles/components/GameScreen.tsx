@@ -10,13 +10,13 @@ function getGridSize(level: number) {
 }
 
 export default function GameScreen({ route }: GameScreenProps) {
-  const { chapterId, level } = route.params
+  const { levelId, chapterId } = route.params;
   const { scale } = useResponsive()
 
-  const gridSize = getGridSize(level)
+  const gridSize = getGridSize(levelId)
 
   const chapterData = chapters[chapterId]
-  const levelData = chapterData.levels[level - 1].grid
+  const levelData = chapterData.levels[levelId - 1].grid
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,15 +24,15 @@ export default function GameScreen({ route }: GameScreenProps) {
         style={[styles.title, { fontSize: 20 * scale }]}
         maxFontSizeMultiplier={1.2}
       >
-        Chapter {chapterId} - Level {level}
+        Chapter {chapterId} - Level {levelId}
       </Text>
 
       <PuzzleBoard
-  size={gridSize}
-  levelData={levelData}
-  chapterId={chapterId}
-  level={level}
-/>
+        size={gridSize}
+        levelData={levelData}
+        chapterId={chapterId}
+        level={levelId}
+      />
     </SafeAreaView>
   )
 }
