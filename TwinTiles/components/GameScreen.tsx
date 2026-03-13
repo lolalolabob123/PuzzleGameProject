@@ -1,51 +1,43 @@
-import { GameScreenProps } from "../navigation/types"
-import { Text, StyleSheet } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import PuzzleBoard from "../components/PuzzleBoard"
-import { chapters } from "../data/chapters"
-import { useResponsive } from "../utils/responsive"
+import React from 'react';
+import { GameScreenProps } from "../navigation/types";
+import PuzzleBoard from "../components/PuzzleBoard";
+import { chapters } from "../data/chapters";
 
-function getGridSize(level: number) {
-  return level <= 5 ? 4 : 6
-}
+export default function GameScreen({ route, navigation }: GameScreenProps) {
+  const { levelId, chapterId, forcedReset } = route.params;
 
-export default function GameScreen({ route }: GameScreenProps) {
-  const { levelId, chapterId } = route.params;
-  const { scale } = useResponsive()
+  const currentChapter = chapters[chapterId];
+  const levelData = currentChapter?.levels.find(l => l.id === levelId);
 
-  const gridSize = getGridSize(levelId)
+  const handleNextLevel = () => {
+    if (!currentChapter) return;
 
-  const chapterData = chapters[chapterId]
-  const levelData = chapterData.levels[levelId - 1].grid
+    const currentIndex = currentChapter.levels.findIndex(l => l.id === levelId);
+    const nextLevel = currentChapter.levels[currentIndex + 1];
+
+    if (nextLevel) {
+      // Use replace to ensure the stack doesn't grow infinitely
+      navigation.replace("Game", { 
+        levelId: nextLevel.id, 
+        chapterId: chapterId,
+        forcedReset: false,
+      });
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  if (!levelData) return null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text
-        style={[styles.title, { fontSize: 20 * scale }]}
-        maxFontSizeMultiplier={1.2}
-      >
-        Chapter {chapterId} - Level {levelId}
-      </Text>
-
-      <PuzzleBoard
-        size={gridSize}
-        levelData={levelData}
-        chapterId={chapterId}
-        level={levelId}
-      />
-    </SafeAreaView>
-  )
+<PuzzleBoard 
+  key={`chapter-${chapterId}-level-${levelId}`}
+  level={levelId}
+  chapterId={chapterId}
+  levelData={levelData.grid}
+  size={Math.sqrt(levelData.grid.length)}
+  onNextLevel={handleNextLevel}
+  forcedReset={forcedReset} // Change 'forcedreset' to 'forcedReset'
+/>
+  );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-})

@@ -30,21 +30,19 @@ export const getChapterProgress = async (chapterId: number): Promise<number> => 
   }
 };
 
-export const saveLevelState = async (chapterId: number, level: number, cells: number[]) => {
-  try {
-    const key = `level_state_${chapterId}_${level}`;
-    await AsyncStorage.setItem(key, JSON.stringify(cells));
-  } catch (e) {
-    console.error("Failed to save level state", e);
-  }
+export const saveLevelState = async (chapterId: number, levelId: number, state: number[]) => {
+  const key = `level_state_${chapterId}_${levelId}`;
+  await AsyncStorage.setItem(key, JSON.stringify(state));
 };
 
-export const getLevelState = async (chapterId: number, level: number) => {
+export const getLevelState = async (chapterId: number, levelId: number) => {
   try {
-    const key = `level_state_${chapterId}_${level}`;
+    const key = `level_state_${chapterId}_${levelId}`;
     const saved = await AsyncStorage.getItem(key);
     return saved ? JSON.parse(saved) : null;
   } catch (e) {
+    // If AsyncStorage fails, return null so the game can still be played (just not saved)
+    console.warn("AsyncStorage not available:", e);
     return null;
   }
 };

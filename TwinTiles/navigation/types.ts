@@ -1,4 +1,4 @@
-import { NavigatorScreenParams } from "@react-navigation/native";
+import { NavigatorScreenParams, CompositeScreenProps } from "@react-navigation/native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -11,16 +11,18 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<TabParamList>;
   Game: {
     chapterId: number;
-    levelId: number; // Changed from 'level' to 'levelId' to match your LevelSelect code
+    levelId: number;
+    forcedReset?: boolean;
   };
   LevelModal: {
     chapterId: number;
   };
 };
 
-// Prop Helpers
-export type HomeScreenProps = BottomTabScreenProps<TabParamList, "Home">;
-export type ChapterSelectProps = BottomTabScreenProps<TabParamList, "Chapters">;
+export type ChapterSelectProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, "Chapters">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 export type LevelModalProps = NativeStackScreenProps<RootStackParamList, "LevelModal">;
 export type GameScreenProps = NativeStackScreenProps<RootStackParamList, "Game">;

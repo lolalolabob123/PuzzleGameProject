@@ -1,69 +1,58 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
-import { FlatList } from "react-native-gesture-handler"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { useNavigation } from "@react-navigation/native"
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ChapterSelectProps } from "../navigation/types";
 
-type Chapter = {
-  id: string,
-  title: string,
-  color: string,
-}
+type ChapterItem = {
+  id: string;
+  title: string;
+  color: string;
+};
 
-const chapters: Chapter[] = [
+const chapterList: ChapterItem[] = [
   { id: '1', title: 'Chapter 1', color: "#42eb20" },
   { id: '2', title: 'Chapter 2', color: "#f7f308" },
   { id: '3', title: 'Chapter 3', color: "#eb9e11" },
   { id: '4', title: 'Chapter 4', color: "#d41919" },
-]
+];
 
-export default function ChapterSelect() {
-
-  const navigation = useNavigation<any>()
-
+export default function ChapterSelect({ navigation }: ChapterSelectProps) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={chapters}
+        data={chapterList}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.chapterItem}
-            onPress={() => navigation.navigate("LevelModal", { chapterId: Number(item.id) })}>
+          <TouchableOpacity 
+            style={styles.chapterItem}
+            onPress={() => navigation.navigate("LevelModal", { chapterId: Number(item.id) })}
+          >
             <Text style={styles.chapterText}>{item.title}</Text>
-            <View
-              style={[
-                styles.chapterAccent,
-                { backgroundColor: item.color }
-              ]}></View>
+            <View style={[styles.chapterAccent, { backgroundColor: item.color }]} />
           </TouchableOpacity>
         )}
-        contentContainerStyle={styles.listContent} />
+        contentContainerStyle={styles.listContent} 
+      />
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  listContent: {
-    padding: 20,
-  },
+  container: { flex: 1 },
+  listContent: { padding: 20 },
   chapterItem: {
-    backgroundColor: "#ffff",
+    backgroundColor: "#fff",
     paddingVertical: 18,
     paddingHorizontal: 20,
     borderRadius: 12,
     marginBottom: 15,
     alignItems: "center",
+    elevation: 3,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
   },
-  chapterText: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
+  chapterText: { fontSize: 18, fontWeight: "600" },
   chapterAccent: {
     position: "absolute",
     left: 10,
