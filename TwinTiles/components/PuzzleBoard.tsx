@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, ImageBackground } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { calculateBoardLayout } from "../utils/boardLayout";
 import { unlockNextLevel, saveLevelState, getLevelState } from "../utils/progress";
+import { GameTheme } from "../constants/themes";
 
 interface PuzzleBoardProps {
   size: number;
@@ -11,6 +12,7 @@ interface PuzzleBoardProps {
   level: number;
   onNextLevel: () => void;
   forcedReset?: boolean;
+  theme: GameTheme;
 }
 
 export default function PuzzleBoard({
@@ -20,13 +22,13 @@ export default function PuzzleBoard({
   level,
   onNextLevel,
   forcedReset = false,
+  theme,
 }: PuzzleBoardProps) {
   const { boardSize, cellSize } = calculateBoardLayout(size);
   const [cells, setCells] = useState<number[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [winModalVisible, setWinModalVisible] = useState(false);
 
-  // WIN LOGIC: Stays the same, ensuring all Binary Puzzle rules are met
   const checkWin = useCallback((board: number[]) => {
     if (board.length === 0 || board.some((c) => c === 0)) return false;
     const limit = size / 2;
@@ -47,19 +49,15 @@ export default function PuzzleBoard({
     return true;
   }, [size]);
 
-  // INITIAL LOAD: Sets the initial state from your fixed 'grid' data
   useEffect(() => {
     let active = true;
     const load = async () => {
       setIsInitializing(true);
       try {
         const saved = await getLevelState(chapterId, level);
-        
         if (active) {
-          // If forcedReset or no save exists, we use your set 'levelData'
-          // If the saved state is already a win, we also reset to the starting grid
           if (forcedReset || !saved || checkWin(saved)) {
-            setCells([...levelData]); 
+            setCells([...levelData]);
             await saveLevelState(chapterId, level, [...levelData]);
           } else {
             setCells(saved);
@@ -75,22 +73,23 @@ export default function PuzzleBoard({
     return () => { active = false; };
   }, [chapterId, level, forcedReset, levelData, checkWin]);
 
-  // WIN MONITOR
   useEffect(() => {
     if (isInitializing || cells.length === 0) return;
-
     if (cells.every((c) => c !== 0) && checkWin(cells)) {
       const handleWin = async () => {
         await unlockNextLevel(chapterId, level);
-        await saveLevelState(chapterId, level, [...levelData]);
         setWinModalVisible(true);
       };
       handleWin();
     }
-  }, [cells, isInitializing, checkWin, chapterId, level, levelData]);
+  }, [cells, isInitializing, checkWin, chapterId, level]);
 
   const cycleCell = (index: number) => {
     if (isInitializing) return;
+
+    // RULE: If the levelData originally had a value here, it's a "fixed" hint.
+    // The player shouldn't be able to change it.
+    if (levelData[index] !== 0) return;
 
     const newCells = [...cells];
     newCells[index] = (newCells[index] + 1) % 3;
@@ -126,35 +125,38 @@ export default function PuzzleBoard({
       </Modal>
 
       <View style={[styles.board, { width: boardSize, height: boardSize }]}>
-        {cells.map((val, i) => (
-          <TouchableOpacity
-            key={i}
-            onPress={() => cycleCell(i)}
-            activeOpacity={0.6}
-            style={[
-              styles.cell,
-              {
-                width: cellSize,
-                height: cellSize,
-                backgroundColor: 
-                  val === 1 ? "#4dabf7" :
-                  val === 2 ? "#ff6b6b" : "#fff",
-                borderWidth: 1,
-                borderColor: "#ced4da",
-              },
-            ]}
-          >
-            <Text
-              style={{
-                color: val === 0 ? "#000" : "#fff",
-                fontWeight: "bold",
-                fontSize: cellSize * 0.4,
-              }}
+        {cells.map((val, i) => {
+          const isFixed = levelData[i] !== 0; // Check if this was a hint tile
+
+          return (
+            <TouchableOpacity
+              key={i}
+              onPress={() => cycleCell(i)}
+              activeOpacity={isFixed ? 1 : 0.7} // Visual feedback: non-clickable if fixed
+              style={{ width: cellSize, height: cellSize }}
             >
-              {val !== 0 ? (val === 1 ? "1" : "2") : ""}
-            </Text>
-          </TouchableOpacity>
-        ))}
+<ImageBackground
+  // CHANGED: Use theme.tileBg instead of ASSETS.tileBackground
+  source={theme?.tileBg} 
+  style={styles.fullCell}
+  imageStyle={{ opacity: isFixed ? 0.6 : 1 }}
+>
+  {val !== 0 && (
+    <Image
+      // CHANGED: Use theme.shape1 and theme.shape2
+      source={val === 1 ? theme.shape1 : theme.shape2}
+      style={{
+        width: cellSize * 0.7,
+        height: cellSize * 0.7,
+        opacity: isFixed ? 0.8 : 1, 
+      }}
+      resizeMode="contain"
+    />
+  )}
+</ImageBackground>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </SafeAreaView>
   );
@@ -163,8 +165,8 @@ export default function PuzzleBoard({
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f8f9fa" },
   loadingText: { color: "#adb5bd", fontSize: 18, fontWeight: "500" },
-  board: { flexDirection: "row", flexWrap: "wrap", backgroundColor: "#adb5bd", borderRadius: 8, overflow: "hidden" },
-  cell: { justifyContent: "center", alignItems: "center" },
+  board: { flexDirection: "row", flexWrap: "wrap", backgroundColor: "transparent" },
+  fullCell: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
   modalContent: { backgroundColor: "#fff", padding: 25, borderRadius: 20, width: "80%", alignItems: "center" },
   modalTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },

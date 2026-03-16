@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 export type TabParamList = {
   Home: undefined;
-  Chapters: undefined;
+  Chapters: {themeIndex?: number}
 };
 
 export type RootStackParamList = {
@@ -13,9 +13,11 @@ export type RootStackParamList = {
     chapterId: number;
     levelId: number;
     forcedReset?: boolean;
+    themeIndex: number;
   };
   LevelModal: {
     chapterId: number;
+    themeIndex: number;
   };
 };
 

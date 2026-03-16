@@ -8,6 +8,7 @@ import GameScreen from './components/GameScreen'
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RootStackParamList, TabParamList } from "./navigation/types";
 import { FontAwesome } from "@expo/vector-icons";
+import { ThemeProvider } from "./context/ThemeContext";
 
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -22,9 +23,9 @@ function Tabs() {
           let iconName: keyof typeof FontAwesome.glyphMap = "circle";
 
           if (route.name === "Home") {
-            iconName = focused ? "home" : "home";
+            iconName = "home";
           } else if (route.name === "Chapters") {
-            iconName = focused ? "th-large" : "th-large";
+            iconName = "th-large";
           }
 
           return <FontAwesome name={iconName} size={size} color={color} />;
@@ -38,35 +39,38 @@ function Tabs() {
     </Tab.Navigator>
   );
 }
-
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <RootStack.Navigator>
-          <RootStack.Group>
-            <RootStack.Screen
-              name="Main"
-              component={Tabs}
-              options={{ headerShown: false,  }}
-              
-            />
-          </RootStack.Group>
-          <RootStack.Group screenOptions={{ presentation: "modal" }}>
-            <RootStack.Screen
-              name="Game"
-              component={GameScreen}
-              options={{ title: "Puzzle" }}
-            />
-          </RootStack.Group>
-          <RootStack.Group screenOptions={{ presentation: 'modal' }}>
-            <RootStack.Screen
-              name="LevelModal"
-              component={LevelSelect}
-              options={{ title: 'Select a Level' }} />
-          </RootStack.Group>
-        </RootStack.Navigator>
-      </NavigationContainer>
+      <ThemeProvider> 
+        <NavigationContainer>
+          <RootStack.Navigator>
+            <RootStack.Group>
+              <RootStack.Screen
+                name="Main"
+                component={Tabs}
+                options={{ headerShown: false }}
+              />
+            </RootStack.Group>
+            
+            <RootStack.Group screenOptions={{ presentation: "modal" }}>
+              <RootStack.Screen
+                name="Game"
+                component={GameScreen}
+                options={{ title: "Puzzle" }}
+              />
+            </RootStack.Group>
+
+            <RootStack.Group screenOptions={{ presentation: 'modal' }}>
+              <RootStack.Screen
+                name="LevelModal"
+                component={LevelSelect}
+                options={{ title: 'Select a Level' }} 
+              />
+            </RootStack.Group>
+          </RootStack.Navigator>
+        </NavigationContainer>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

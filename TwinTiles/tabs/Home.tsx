@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Pressable } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context'
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Pressable, Image } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from "@expo/vector-icons";
+import { AVAILABLE_THEMES, GameTheme } from "../constants/themes";
+import { useTheme } from "../context/ThemeContext"; // Added
 
 export default function HomeScreen() {
-
-  const [infoVisible, setInfoVisible] = useState(false)
-  const [profileMenuVisible, setProfileMenuVisible] = useState(false)
-  const [settingsVisible, setSettingsVisible] = useState(false)
-
-  const openSettings = () => {
-    setProfileMenuVisible(true)
-    setSettingsVisible(true)
-  }
+  const [infoVisible, setInfoVisible] = useState(false);
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  
+  // Changed: Use global theme state instead of local useState
+  const { themeIndex, setTheme } = useTheme();
+  const currentTheme = AVAILABLE_THEMES[themeIndex];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,43 +24,34 @@ export default function HomeScreen() {
           <FontAwesome name="user-circle" size={40} color="black" />
         </TouchableOpacity>
       </View>
+
       <View style={styles.rankContainer}>
         <Text style={styles.rankText}>Rank</Text>
       </View>
 
-      <Modal
-      visible={profileMenuVisible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setProfileMenuVisible(false)}
-      >
-        <Pressable
-        style={styles.menuOverlay}
-        onPress={() => setProfileMenuVisible(false)}
-        >
+      <Modal visible={profileMenuVisible} transparent={true} animationType="fade">
+        <Pressable style={styles.menuOverlay} onPress={() => setProfileMenuVisible(false)}>
           <View style={styles.profileMenu}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
-              <FontAwesome name="user" size={18} color="#444"/>
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => {
+                setProfileMenuVisible(false);
+                setSettingsVisible(true);
+              }}
+            >
+              <FontAwesome name="cog" size={18} color="#444"/>
               <Text style={styles.menuText}>Settings</Text>
             </TouchableOpacity>
-
             <View style={styles.menuDivider}/>
-
-            <TouchableOpacity style={[styles.menuItem, {marginBottom: 0}]} onPress={() => {}}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
               <FontAwesome name="sign-out" size={18} color="#ff6b6b"/>
               <Text style={[styles.menuText, {color: "#ff6b6b"}]}>Logout</Text>
             </TouchableOpacity>
-
           </View>
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={settingsVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setSettingsVisible(false)}
-      >
+      <Modal visible={settingsVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.settingsPage}>
           <View style={styles.settingsHeader}>
             <Text style={styles.settingsTitle}>Settings</Text>
@@ -69,70 +60,30 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           
-          <View style={styles.settingsContent}>
-            <Text style={styles.settingLabel}>Sound Effects</Text>
-            <Text style={styles.settingLabel}>Haptic Feedback</Text>
-            <Text style={styles.settingLabel}>Account Privacy</Text>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-      animationType="fade"
-      transparent={true}
-      visible={infoVisible}
-      onRequestClose={() => setInfoVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
             
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Game Guide</Text>
-              <TouchableOpacity onPress={() => setInfoVisible(false)}>
-                <FontAwesome name="times-circle" size={24} color="#6c757d" />
-              </TouchableOpacity>
+            <View style={styles.themeGrid}>
+              {AVAILABLE_THEMES.map((theme, index) => ( // Added index
+                <TouchableOpacity 
+                  key={theme.id} 
+                  style={[styles.themeCard, currentTheme.id === theme.id && styles.activeCard]}
+                  onPress={() => setTheme(index)} // Changed: update global theme
+                >
+                  <View style={styles.previewContainer}>
+                    <Image source={theme.shape1} style={styles.miniShape} />
+                    <Image source={theme.shape2} style={styles.miniShape} />
+                  </View>
+                  <Text style={styles.themeLabel}>{theme.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-              
-              <View style={styles.guideSection}>
-                <Text style={styles.sectionHeader}>Basics</Text>
-                <View style={styles.ruleItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={styles.ruleDescription}>Fill the board so every row and column has an equal number of Blue and Red tiles.</Text>
-                </View>
-                <View style={styles.ruleItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={styles.ruleDescription}>No more than two tiles of the same color can be placed side-by-side.</Text>
-                </View>
-              </View>
-
-              <View style={styles.guideSection}>
-                <Text style={styles.sectionHeader}>Tile Types</Text>
-                <View style={styles.ruleItem}>
-                  <View style={[styles.colorIndicator, { backgroundColor: '#1c7ed6' }]} />
-                  <Text style={styles.ruleDescription}><Text style={styles.bold}>Darker Tiles:</Text> These are permanent level starters.</Text>
-                </View>
-                <View style={styles.ruleItem}>
-                  <View style={[styles.colorIndicator, { backgroundColor: '#4dabf7' }]} />
-                  <Text style={styles.ruleDescription}><Text style={styles.bold}>Lighter Tiles:</Text> These are placed by you and can be changed.</Text>
-                </View>
-              </View>
-
-              <View style={[styles.guideSection, styles.lockedSection]}>
-                <Text style={styles.lockedText}>New guides unlock as you progress!</Text>
-              </View>
-
-            </ScrollView>
-
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={() => setInfoVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Back to Game</Text>
-            </TouchableOpacity>
-
-          </View>
+            <View style={styles.settingsContent}>
+              <Text style={styles.settingLabel}>Sound Effects</Text>
+              <Text style={styles.settingLabel}>Haptic Feedback</Text>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -140,188 +91,26 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topNav: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 25,
-    paddingVertical: 15,
-  },
-  rankContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rankText: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "85%",
-    maxHeight: "80%",
-    backgroundColor: "white",
-    borderRadius: 25,
-    padding: 20,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingBottom: 10,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#212529",
-  },
-  scrollView: {
-    marginBottom: 15,
-  },
-  guideSection: {
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#4dabf7",
-    marginBottom: 10,
-  },
-  ruleItem: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    paddingRight: 10,
-  },
-  bullet: {
-    fontSize: 18,
-    color: '#333',
-    marginRight: 10,
-    fontWeight: 'bold',
-  },
-  colorIndicator: {
-    width: 14,
-    height: 14,
-    borderRadius: 3,
-    marginRight: 10,
-    marginTop: 4,
-  },
-  ruleDescription: {
-    fontSize: 15,
-    color: "#495057",
-    lineHeight: 20,
-    flex: 1,
-  },
-  bold: {
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  lockedSection: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 10,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    alignItems: 'center',
-  },
-  lockedText: {
-    color: '#adb5bd',
-    fontStyle: 'italic',
-    fontSize: 13,
-  },
-  closeButton: {
-    backgroundColor: "#212529",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  closeButtonText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)', // Very light dim
-  },
-  profileMenu: {
-    position: 'absolute',
-    top: 60, // Adjust based on your header height
-    right: 20,
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 10,
-    width: 160,
-    // Shadow for iOS
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    // Shadow for Android
-    elevation: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    marginBottom: 5,
-  },
-  menuText: {
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#eee',
-    marginVertical: 5,
-  },
-
-  // Settings Page
-  settingsPage: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    padding: 20,
-  },
-  settingsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 30,
-    marginTop: 10,
-  },
-  settingsTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  doneButton: {
-    fontSize: 18,
-    color: '#4dabf7',
-    fontWeight: '600',
-  },
-  settingsContent: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 15,
-  },
-  settingLabel: {
-    fontSize: 16,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    color: '#333',
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  topNav: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 25, paddingVertical: 15 },
+  rankContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  rankText: { fontSize: 24, fontWeight: "bold" },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.1)' },
+  profileMenu: { position: 'absolute', top: 60, right: 20, backgroundColor: 'white', borderRadius: 15, padding: 10, width: 160, elevation: 8, shadowOpacity: 0.2 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10 },
+  menuText: { marginLeft: 12, fontSize: 16, fontWeight: '500' },
+  menuDivider: { height: 1, backgroundColor: '#eee' },
+  settingsPage: { flex: 1, backgroundColor: '#f8f9fa', padding: 20 },
+  settingsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  settingsTitle: { fontSize: 28, fontWeight: 'bold' },
+  doneButton: { fontSize: 18, color: '#4dabf7', fontWeight: '600' },
+  sectionSubHeader: { fontSize: 13, fontWeight: 'bold', color: '#adb5bd', textTransform: 'uppercase', marginBottom: 15 },
+  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  themeCard: { width: '48%', backgroundColor: 'white', borderRadius: 16, padding: 15, marginBottom: 15, alignItems: 'center', borderWidth: 2, borderColor: '#e9ecef' },
+  activeCard: { borderColor: '#4dabf7', backgroundColor: '#e7f5ff' },
+  previewContainer: { flexDirection: 'row', marginBottom: 10 },
+  miniShape: { width: 30, height: 30, marginHorizontal: 3 },
+  themeLabel: { fontSize: 14, fontWeight: '600', color: '#495057' },
+  settingsContent: { backgroundColor: 'white', borderRadius: 15, padding: 15 },
+  settingLabel: { fontSize: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
 });

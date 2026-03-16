@@ -5,9 +5,11 @@ import { useIsFocused } from "@react-navigation/native";
 import { LevelModalProps } from "../navigation/types";
 import { getChapterProgress } from "../utils/progress";
 import { chapters } from "../data/chapters";
+import { useTheme } from "../context/ThemeContext";
 
 export default function LevelSelectScreen({ navigation, route }: LevelModalProps) {
   const { chapterId } = route.params;
+  const { themeIndex } = useTheme(); // Added: Get theme globally
   const [unlockedLevel, setUnlockedLevel] = useState(1);
   const isFocused = useIsFocused();
 
@@ -23,7 +25,7 @@ export default function LevelSelectScreen({ navigation, route }: LevelModalProps
   if (!currentChapter) return null;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+<ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{currentChapter.title}</Text>
       <View style={styles.levelGrid}>
         {currentChapter.levels.map((lvl) => {
@@ -34,17 +36,14 @@ export default function LevelSelectScreen({ navigation, route }: LevelModalProps
             <TouchableOpacity
               key={lvl.id}
               disabled={isLocked}
-              style={[
-                styles.levelButton,
-                isLocked ? styles.levelLocked : (isCompleted ? styles.levelCompleted : styles.levelUnlocked)
-              ]}
+              style={[styles.levelButton, isLocked ? styles.levelLocked : (isCompleted ? styles.levelCompleted : styles.levelUnlocked)]}
               onPress={() => {
-                // Determine if we should force a reset based on completion status
                 const needsReset = lvl.id < unlockedLevel;
                 navigation.navigate("Game", {
                   levelId: lvl.id,
                   chapterId: chapterId,
-                  forcedReset: needsReset 
+                  forcedReset: needsReset,
+                  themeIndex: themeIndex, // Pass global index
                 });
               }}
             >

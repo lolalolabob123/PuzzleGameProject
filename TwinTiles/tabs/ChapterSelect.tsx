@@ -16,7 +16,13 @@ const chapterList: ChapterItem[] = [
   { id: '4', title: 'Chapter 4', color: "#d41919" },
 ];
 
-export default function ChapterSelect({ navigation }: ChapterSelectProps) {
+// We use ChapterSelectProps here to define the route and navigation types
+export default function ChapterSelect({ navigation, route }: ChapterSelectProps) {
+  
+  // By using the ChapterSelectProps type, TypeScript now knows themeIndex exists
+  // We use a fallback of 0 in case it's not passed
+  const themeIndex = (route.params as any)?.themeIndex ?? 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
@@ -25,7 +31,12 @@ export default function ChapterSelect({ navigation }: ChapterSelectProps) {
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.chapterItem}
-            onPress={() => navigation.navigate("LevelModal", { chapterId: Number(item.id) })}
+            onPress={() => 
+              navigation.navigate("LevelModal", { 
+                chapterId: Number(item.id),
+                themeIndex: themeIndex 
+              })
+            }
           >
             <Text style={styles.chapterText}>{item.title}</Text>
             <View style={[styles.chapterAccent, { backgroundColor: item.color }]} />
