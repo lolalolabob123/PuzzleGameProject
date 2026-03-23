@@ -25,7 +25,7 @@ export default function LevelSelectScreen({ navigation, route }: LevelModalProps
   if (!currentChapter) return null;
 
   return (
-<ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{currentChapter.title}</Text>
       <View style={styles.levelGrid}>
         {currentChapter.levels.map((lvl) => {
