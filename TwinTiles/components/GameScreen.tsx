@@ -2,21 +2,24 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native'; // Added missing imports
 import { GameScreenProps } from "../navigation/types";
 import PuzzleBoard from "../components/PuzzleBoard";
-import { chapters } from "../data/chapters";
+import { chapters, Level } from "../data/chapters";
 import { AVAILABLE_THEMES } from "../constants/themes";
 
 export default function GameScreen({ route, navigation }: GameScreenProps) {
   const { levelId, chapterId, forcedReset, themeIndex } = route.params;
 
   const currentChapter = chapters[chapterId];
-  const levelData = currentChapter?.levels.find(l => l.id === levelId);
+  const levelData = currentChapter?.levels.find((l: Level) => l.id === levelId)
 
+  if(!levelData) return null
+
+  const gridSize = levelData.size
   const [activeTheme] = useState(AVAILABLE_THEMES[themeIndex ?? 0])
 
   const handleNextLevel = () => {
     if (!currentChapter) return;
 
-    const currentIndex = currentChapter.levels.findIndex(l => l.id === levelId);
+    const currentIndex = currentChapter.levels.findIndex((l: Level) => l.id === levelId);
     const nextLevel = currentChapter.levels[currentIndex + 1];
 
     if (nextLevel) {
@@ -37,12 +40,10 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
 return (
   <View style={styles.container}>
     <PuzzleBoard 
-      // 1. We use levelData.grid because your type defines 'grid'
       levelData={levelData.grid} 
       chapterId={chapterId}
       level={levelId} 
-      // 2. We calculate the square root of the array length (16 -> 4, 36 -> 6)
-      size={Math.sqrt(levelData.grid.length)} 
+      size={levelData.size} // Changed from Math.sqrt to the direct property
       onNextLevel={handleNextLevel}
       forcedReset={forcedReset}
       theme={activeTheme} 

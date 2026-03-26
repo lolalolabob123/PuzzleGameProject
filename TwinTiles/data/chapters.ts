@@ -1,67 +1,107 @@
-export type Level = {
-  id: number;
-  grid: number[];
-};
+// export type Level = {
+//   id: number;
+//   grid: number[];
+// };
 
-export type Chapter = {
+// export type Chapter = {
+//   title: string;
+//   levels: Level[];
+// };
+
+// export const chapters: Record<number, Chapter> = {
+//   1: {
+//     title: "Chapter 1: The Basics",
+//     levels: [
+//       { id: 1, grid: [1, 0, 0, 2, 0, 0, 2, 0, 0, 1, 0, 0, 2, 0, 0, 1] },
+//       { id: 2, grid: [0, 2, 0, 2, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2, 1] },
+//       { id: 3, grid: [2, 2, 0, 1, 0, 0, 1, 0, 0, 1, 0, 2, 1, 0, 0, 0] },
+      
+//       // FIXED LEVEL 4: Encourages "Sandwich" and "Duo" logic without conflict
+//       { id: 4, grid: [1, 1, 0, 0, 0, 0, 2, 2, 0, 2, 0, 0, 2, 0, 1, 0] },
+
+//       // FIXED LEVEL 5: A cleaner 4x4 Finale
+//       { id: 5, grid: [0, 0, 0, 0, 0, 1, 1, 0, 2, 0, 0, 2, 2, 0, 0, 0] },
+
+//       { id: 6, grid: [
+//         1, 1, 0, 2, 0, 2,
+//         0, 0, 2, 0, 0, 0,
+//         2, 0, 0, 1, 1, 0,
+//         0, 1, 0, 0, 2, 2,
+//         0, 0, 0, 2, 0, 0,
+//         2, 2, 0, 0, 1, 1
+//       ]},
+//       { id: 7, grid: [
+//         0, 0, 2, 2, 0, 0,
+//         1, 0, 0, 0, 0, 1,
+//         1, 0, 2, 0, 2, 0,
+//         0, 0, 2, 0, 0, 2,
+//         0, 2, 0, 0, 1, 1,
+//         0, 0, 0, 1, 0, 0
+//       ]},
+//       { id: 8, grid: [
+//         0, 1, 0, 0, 2, 2,
+//         0, 1, 0, 0, 0, 0,
+//         2, 0, 0, 1, 0, 1,
+//         2, 0, 1, 1, 0, 0,
+//         0, 0, 0, 0, 2, 0,
+//         1, 0, 2, 2, 0, 0
+//       ]},
+//       { id: 9, grid: [
+//         0, 0, 0, 0, 0, 2,
+//         1, 1, 0, 2, 0, 0,
+//         0, 0, 0, 0, 1, 1,
+//         0, 2, 2, 0, 0, 0,
+//         0, 0, 1, 0, 2, 2,
+//         1, 0, 0, 0, 0, 0
+//       ]},
+//       { id: 10, grid: [
+//         0, 0, 1, 0, 0, 2,
+//         0, 2, 0, 0, 0, 0,
+//         0, 2, 0, 1, 1, 0,
+//         0, 0, 0, 0, 0, 1,
+//         2, 2, 0, 1, 0, 0,
+//         0, 0, 0, 0, 2, 2
+//       ]},
+//     ]
+//   }
+// };
+
+import { getFixedLevel } from "../utils/levelGenerator";
+
+export interface Level {
+  id: number;
+  size: number;
+  grid: number[];
+}
+
+export interface Chapter {
   title: string;
   levels: Level[];
-};
+}
+
+const generateChapterLevels = (chapterId: number, totalLevels: number, ): Level[] => {
+  return Array.from({length: totalLevels}, (_, i) => {
+    const levelId = i + 1
+    const size = levelId <= 5 ? 4 : 6
+
+    const difficulty = 0.4 + (i * 0.03)
+
+    return {
+      id: levelId,
+      size: size,
+      grid: getFixedLevel(chapterId, levelId, size, difficulty)
+    }
+  })
+}
 
 export const chapters: Record<number, Chapter> = {
   1: {
     title: "Chapter 1: The Basics",
-    levels: [
-      { id: 1, grid: [1, 0, 0, 2, 0, 0, 2, 0, 0, 1, 0, 0, 2, 0, 0, 1] },
-      { id: 2, grid: [0, 2, 0, 2, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2, 1] },
-      { id: 3, grid: [2, 2, 0, 1, 0, 0, 1, 0, 0, 1, 0, 2, 1, 0, 0, 0] },
-      
-      // FIXED LEVEL 4: Encourages "Sandwich" and "Duo" logic without conflict
-      { id: 4, grid: [1, 1, 0, 0, 0, 0, 2, 2, 0, 2, 0, 0, 2, 0, 1, 0] },
-
-      // FIXED LEVEL 5: A cleaner 4x4 Finale
-      { id: 5, grid: [0, 0, 0, 0, 0, 1, 1, 0, 2, 0, 0, 2, 2, 0, 0, 0] },
-
-      { id: 6, grid: [
-        1, 1, 0, 2, 0, 2,
-        0, 0, 2, 0, 0, 0,
-        2, 0, 0, 1, 1, 0,
-        0, 1, 0, 0, 2, 2,
-        0, 0, 0, 2, 0, 0,
-        2, 2, 0, 0, 1, 1
-      ]},
-      { id: 7, grid: [
-        0, 0, 2, 2, 0, 0,
-        1, 0, 0, 0, 0, 1,
-        1, 0, 2, 0, 2, 0,
-        0, 0, 2, 0, 0, 2,
-        0, 2, 0, 0, 1, 1,
-        0, 0, 0, 1, 0, 0
-      ]},
-      { id: 8, grid: [
-        0, 1, 0, 0, 2, 2,
-        0, 1, 0, 0, 0, 0,
-        2, 0, 0, 1, 0, 1,
-        2, 0, 1, 1, 0, 0,
-        0, 0, 0, 0, 2, 0,
-        1, 0, 2, 2, 0, 0
-      ]},
-      { id: 9, grid: [
-        0, 0, 0, 0, 0, 2,
-        1, 1, 0, 2, 0, 0,
-        0, 0, 0, 0, 1, 1,
-        0, 2, 2, 0, 0, 0,
-        0, 0, 1, 0, 2, 2,
-        1, 0, 0, 0, 0, 0
-      ]},
-      { id: 10, grid: [
-        0, 0, 1, 0, 0, 2,
-        0, 2, 0, 0, 0, 0,
-        0, 2, 0, 1, 1, 0,
-        0, 0, 0, 0, 0, 1,
-        2, 2, 0, 1, 0, 0,
-        0, 0, 0, 0, 2, 2
-      ]},
-    ]
+    levels: generateChapterLevels(1, 10), // Automatically generates 10 unique, seeded levels
+  },
+  // You can now easily add Chapter 2
+  2: {
+    title: "Chapter 2: Intermediate",
+    levels: generateChapterLevels(2, 10),
   }
 };

@@ -4,7 +4,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { LevelModalProps } from "../navigation/types";
 import { getChapterProgress } from "../utils/progress";
-import { chapters } from "../data/chapters";
+import { chapters, Level } from "../data/chapters";
 import { useTheme } from "../context/ThemeContext";
 
 export default function LevelSelectScreen({ navigation, route }: LevelModalProps) {
@@ -16,7 +16,7 @@ export default function LevelSelectScreen({ navigation, route }: LevelModalProps
   useEffect(() => {
     const loadProgress = async () => {
       const reached = await getChapterProgress(chapterId);
-      setUnlockedLevel(Number(reached));
+      setUnlockedLevel(Number(reached ?? 1));
     };
     if (isFocused) loadProgress();
   }, [chapterId, isFocused]);
@@ -28,7 +28,7 @@ export default function LevelSelectScreen({ navigation, route }: LevelModalProps
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{currentChapter.title}</Text>
       <View style={styles.levelGrid}>
-        {currentChapter.levels.map((lvl) => {
+        {currentChapter.levels.map((lvl: Level) => {
           const isLocked = lvl.id > unlockedLevel;
           const isCompleted = lvl.id < unlockedLevel;
 

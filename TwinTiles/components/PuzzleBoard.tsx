@@ -34,16 +34,18 @@ export default function PuzzleBoard({
     const limit = size / 2;
 
     for (let i = 0; i < size; i++) {
-      const row = board.slice(i * size, i * size + size);
+      const row = board.slice(i * size, (i + 1) * size);
       const col = [];
       for (let j = 0; j < size; j++) col.push(board[j * size + i]);
 
-      if (row.filter((c) => c === 1).length !== limit || row.filter((c) => c === 2).length !== limit) return false;
-      if (col.filter((c) => c === 1).length !== limit || col.filter((c) => c === 2).length !== limit) return false;
+      // Rule 1: Equal number of each color
+      if (row.filter(c => c === 1).length !== limit || row.filter(c => c === 2).length !== limit) return false;
+      if (col.filter(c => c === 1).length !== limit || col.filter(c => c === 2).length !== limit) return false;
 
+      // Rule 2: No more than two of the same color next to each other
       for (let j = 0; j < size - 2; j++) {
-        if (row[j] !== 0 && row[j] === row[j + 1] && row[j] === row[j + 2]) return false;
-        if (col[j] !== 0 && col[j] === col[j + 1] && col[j] === col[j + 2]) return false;
+        if (row[j] === row[j + 1] && row[j] === row[j + 2]) return false;
+        if (col[j] === col[j + 1] && col[j] === col[j + 2]) return false;
       }
     }
     return true;
@@ -135,25 +137,25 @@ export default function PuzzleBoard({
               activeOpacity={isFixed ? 1 : 0.7} // Visual feedback: non-clickable if fixed
               style={{ width: cellSize, height: cellSize }}
             >
-<ImageBackground
-  // CHANGED: Use theme.tileBg instead of ASSETS.tileBackground
-  source={theme?.tileBg} 
-  style={styles.fullCell}
-  imageStyle={{ opacity: isFixed ? 0.6 : 1 }}
->
-  {val !== 0 && (
-    <Image
-      // CHANGED: Use theme.shape1 and theme.shape2
-      source={val === 1 ? theme.shape1 : theme.shape2}
-      style={{
-        width: cellSize * 0.7,
-        height: cellSize * 0.7,
-        opacity: isFixed ? 0.8 : 1, 
-      }}
-      resizeMode="contain"
-    />
-  )}
-</ImageBackground>
+              <ImageBackground
+                // CHANGED: Use theme.tileBg instead of ASSETS.tileBackground
+                source={theme?.tileBg}
+                style={styles.fullCell}
+                imageStyle={{ opacity: isFixed ? 0.6 : 1 }}
+              >
+                {val !== 0 && (
+                  <Image
+                    // CHANGED: Use theme.shape1 and theme.shape2
+                    source={val === 1 ? theme.shape1 : theme.shape2}
+                    style={{
+                      width: cellSize * 0.7,
+                      height: cellSize * 0.7,
+                      opacity: isFixed ? 0.8 : 1,
+                    }}
+                    resizeMode="contain"
+                  />
+                )}
+              </ImageBackground>
             </TouchableOpacity>
           );
         })}

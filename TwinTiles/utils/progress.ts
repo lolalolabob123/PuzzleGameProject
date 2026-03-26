@@ -41,8 +41,43 @@ export const getLevelState = async (chapterId: number, levelId: number) => {
     const saved = await AsyncStorage.getItem(key);
     return saved ? JSON.parse(saved) : null;
   } catch (e) {
-    // If AsyncStorage fails, return null so the game can still be played (just not saved)
     console.warn("AsyncStorage not available:", e);
     return null;
+  }
+};
+
+export const resetChapterProgress = async (chapterId: number) => {
+  try {
+    const rawProgress = await AsyncStorage.getItem(PROGRESS_KEY);
+    let progress = rawProgress ? JSON.parse(rawProgress) : {};
+    progress[`chapter_${chapterId}`] = 1;
+    await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+
+    const allKeys = await AsyncStorage.getAllKeys();
+    const statesToClear = allKeys.filter(key => 
+      key.startsWith(`level_state_${chapterId}_`)
+    );
+
+    if (statesToClear.length > 0) {
+      await AsyncStorage.multiRemove(statesToClear);
+    }
+
+    console.log(`Chapter ${chapterId} fully wiped: progress and board states.`);
+  } catch (e) {
+    console.error("Failed to fully reset chapter", e);
+  }
+};
+export const clearAllGameData = async () => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const gameKeys = keys.filter(key => 
+      key.startsWith('chapter_') || 
+      key.startsWith('level_state_') || 
+      key === 'GAME_PROGRESS'
+    );
+    await AsyncStorage.multiRemove(gameKeys);
+    console.log("All game data wiped.");
+  } catch (e) {
+    console.error("Failed to clear game data", e);
   }
 };
