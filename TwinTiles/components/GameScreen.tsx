@@ -39,11 +39,12 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
 
 return (
   <View style={styles.container}>
-    <PuzzleBoard 
+<PuzzleBoard 
+      key={`${chapterId}-${levelId}`} 
       levelData={levelData.grid} 
       chapterId={chapterId}
       level={levelId} 
-      size={levelData.size} // Changed from Math.sqrt to the direct property
+      size={levelData.size}
       onNextLevel={handleNextLevel}
       forcedReset={forcedReset}
       theme={activeTheme} 

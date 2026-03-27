@@ -1,83 +1,89 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
-import { FontAwesome } from "@expo/vector-icons";
-import { useIsFocused } from "@react-navigation/native";
-import { LevelModalProps } from "../navigation/types";
-import { getChapterProgress } from "../utils/progress";
-import { chapters, Level } from "../data/chapters";
-import { useTheme } from "../context/ThemeContext";
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { getLevelStars } from '../utils/progress';
+import { StackScreenProps } from '@react-navigation/stack';
 
-export default function LevelSelectScreen({ navigation, route }: LevelModalProps) {
-  const { chapterId } = route.params;
-  const { themeIndex } = useTheme(); // Added: Get theme globally
-  const [unlockedLevel, setUnlockedLevel] = useState(1);
-  const isFocused = useIsFocused();
+type RootStackParamList = {
+  LevelSelect: { chapterId: number };
+  Game: { level: number; chapterId: number };
+};
+
+type Props = StackScreenProps<RootStackParamList, 'LevelSelect'>;
+
+const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1);
+
+export default function LevelSelect({ navigation, route }: Props) {
+  const chapterId = route.params?.chapterId ?? 1;
+  const [levelData, setLevelData] = useState<{ [key: number]: number }>({});
 
   useEffect(() => {
-    const loadProgress = async () => {
-      const reached = await getChapterProgress(chapterId);
-      setUnlockedLevel(Number(reached ?? 1));
+    const loadStars = async () => {
+      const data: { [key: number]: number } = {};
+      for (const level of LEVELS) {
+        const stars = await getLevelStars(chapterId, level);
+        data[level] = stars;
+      }
+      setLevelData(data);
     };
-    if (isFocused) loadProgress();
-  }, [chapterId, isFocused]);
+    loadStars();
+  }, [chapterId]);
 
-  const currentChapter = chapters[chapterId];
-  if (!currentChapter) return null;
+  const renderLevel = ({ item: level }: { item: number }) => {
+    const stars = levelData[level] || 0;
+
+    return (
+      <TouchableOpacity
+        style={styles.levelCard}
+        onPress={() => navigation.navigate('Game', { level, chapterId })}
+      >
+        <Text style={styles.levelNumber}>{level}</Text>
+        <View style={styles.starContainer}>
+          {[1, 2, 3].map((s) => (
+            <Text
+              key={s}
+              style={[styles.smallStar, { color: s <= stars ? '#fcc419' : '#dee2e6' }]}
+            >
+              ★
+            </Text>
+          ))}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{currentChapter.title}</Text>
-      <View style={styles.levelGrid}>
-        {currentChapter.levels.map((lvl: Level) => {
-          const isLocked = lvl.id > unlockedLevel;
-          const isCompleted = lvl.id < unlockedLevel;
-
-          return (
-            <TouchableOpacity
-              key={lvl.id}
-              disabled={isLocked}
-              style={[styles.levelButton, isLocked ? styles.levelLocked : (isCompleted ? styles.levelCompleted : styles.levelUnlocked)]}
-              onPress={() => {
-                const needsReset = lvl.id < unlockedLevel;
-                navigation.navigate("Game", {
-                  levelId: lvl.id,
-                  chapterId: chapterId,
-                  forcedReset: needsReset,
-                  themeIndex: themeIndex, // Pass global index
-                });
-              }}
-            >
-              {isLocked ? (
-                <FontAwesome name="lock" size={24} color="#adb5bd" />
-              ) : (
-                <View style={styles.cellContent}>
-                  <Text style={styles.levelText}>{lvl.id}</Text>
-                  {isCompleted && (
-                    <FontAwesome name="check-circle" size={14} color="white" style={styles.checkIcon} />
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </ScrollView>
+    <View style={styles.container}>
+      <Text style={styles.title}>Select Level</Text>
+      <FlatList
+        data={LEVELS}
+        renderItem={renderLevel}
+        keyExtractor={(item) => item.toString()}
+        numColumns={4}
+        contentContainerStyle={styles.listContent}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, alignItems: 'center', backgroundColor: '#f8f9fa' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20, color: '#212529' },
-  levelGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  levelButton: {
-    width: 70, height: 70, margin: 10, borderRadius: 15,
-    justifyContent: 'center', alignItems: 'center', elevation: 3,
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4,
+  container: { flex: 1, backgroundColor: '#f8f9fa', padding: 20 },
+  title: { fontSize: 28, fontWeight: '900', color: '#212529', marginBottom: 20, textAlign: 'center' },
+  listContent: { paddingBottom: 40 },
+  levelCard: {
+    width: 75,
+    height: 90,
+    backgroundColor: '#fff',
+    margin: 10,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  levelUnlocked: { backgroundColor: '#4dabf7' },
-  levelCompleted: { backgroundColor: '#37b24d' },
-  levelLocked: { backgroundColor: '#e9ecef', borderWidth: 1, borderColor: '#dee2e6' },
-  levelText: { color: 'white', fontSize: 22, fontWeight: 'bold' },
-  cellContent: { alignItems: 'center', justifyContent: 'center' },
-  checkIcon: { position: 'absolute', top: -10, right: -10 }
+  levelNumber: { fontSize: 24, fontWeight: 'bold', color: '#495057' },
+  starContainer: { flexDirection: 'row', marginTop: 5 },
+  smallStar: { fontSize: 14, marginHorizontal: 1 },
 });

@@ -81,3 +81,27 @@ export const clearAllGameData = async () => {
     console.error("Failed to clear game data", e);
   }
 };
+
+export const saveLevelStars = async (chapterId: number, level: number, stars: number) => {
+  try {
+    const key = `stars_${chapterId}_${level}`;
+    const existingStars = await AsyncStorage.getItem(key);
+    
+    // Only update if the new score is better than the old one
+    if (!existingStars || stars > parseInt(existingStars)) {
+      await AsyncStorage.setItem(key, stars.toString());
+    }
+  } catch (e) {
+    console.error("Failed to save stars", e);
+  }
+};
+
+export const getLevelStars = async (chapterId: number, level: number) => {
+  try {
+    const key = `stars_${chapterId}_${level}`;
+    const stars = await AsyncStorage.getItem(key);
+    return stars ? parseInt(stars) : 0;
+  } catch (e) {
+    return 0;
+  }
+};
