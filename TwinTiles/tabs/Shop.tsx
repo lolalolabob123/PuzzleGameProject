@@ -1,6 +1,6 @@
 import {View, Text} from 'react-native'
 
-export default function Leaderboard(){
+export default function Shop(){
     return (
         <View>
             <Text>Shop</Text>
