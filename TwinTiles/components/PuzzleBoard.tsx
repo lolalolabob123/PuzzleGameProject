@@ -8,8 +8,10 @@ import {
   Image,
   ImageBackground,
   Animated,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Haptics from 'expo-haptics';
 import { calculateBoardLayout } from "../utils/boardLayout";
 import {
   unlockNextLevel,
@@ -38,41 +40,42 @@ export default function PuzzleBoard({
   forcedReset = false,
   theme,
 }: PuzzleBoardProps) {
-  const { boardSize, cellSize } = calculateBoardLayout(size);
+  // --- DYNAMIC LAYOUT ---
+  const INDICATOR_WIDTH = 40; 
+  const SCREEN_PADDING = 32;
+  const screenWidth = Dimensions.get('window').width;
+  const maxAvailableWidth = screenWidth - INDICATOR_WIDTH - SCREEN_PADDING;
+  const { cellSize: rawCellSize } = calculateBoardLayout(size);
+  const cellSize = Math.min(Math.floor(rawCellSize), Math.floor(maxAvailableWidth / size));
+  const boardSize = cellSize * size;
 
+  // --- STATE ---
   const [cells, setCells] = useState<number[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [winModalVisible, setWinModalVisible] = useState(false);
   const [history, setHistory] = useState<number[][]>([]);
-  const [hintIndex, setHintIndex] = useState<number | null>(null);
   const [hintsLeft, setHintsLeft] = useState(3);
   const [moveCount, setMoveCount] = useState(0);
   const [userHasMoved, setUserHasMoved] = useState(false);
+  const [starsEarned, setStarsEarned] = useState(0);
 
-  const hintPulse = useRef(new Animated.Value(1)).current;
-  const star1Anim = useRef(new Animated.Value(0)).current;
-  const star2Anim = useRef(new Animated.Value(0)).current;
-  const star3Anim = useRef(new Animated.Value(0)).current;
-  
-  const nextLevelBtnRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
+  // --- ANIMATIONS ---
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const starAnims = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
 
-  const INDICATOR_WIDTH = 40;
-  const VISUAL_OFFSET = INDICATOR_WIDTH / 2;
   const limit = size / 2;
 
-  // --- LOGIC HELPERS ---
-
-  /**
-   * Centralized validation for a single row or column array
-   */
+  // --- LOGIC ---
   const getValidationState = useCallback((arr: number[]) => {
     const counts = {
       one: arr.filter((c) => c === 1).length,
       two: arr.filter((c) => c === 2).length,
     };
-
     const overLimit = counts.one > limit || counts.two > limit;
-
     let tripleFound = false;
     for (let i = 0; i < arr.length - 2; i++) {
       if (arr[i] !== 0 && arr[i] === arr[i + 1] && arr[i] === arr[i + 2]) {
@@ -80,105 +83,36 @@ export default function PuzzleBoard({
         break;
       }
     }
-
-    const isFull = (counts.one + counts.two) === size;
-
     return {
       isInvalid: overLimit || tripleFound,
-      isComplete: isFull && !overLimit && !tripleFound,
+      isComplete: (counts.one + counts.two) === size && !overLimit && !tripleFound,
       counts
     };
   }, [limit, size]);
 
+  const triggerShake = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
+
   const checkWin = useCallback((board: number[]) => {
     if (!board || board.length === 0 || board.some((c) => c === 0)) return false;
-
     for (let i = 0; i < size; i++) {
       const row = board.slice(i * size, (i + 1) * size);
-      const col = [];
-      for (let j = 0; j < size; j++) col.push(board[j * size + i]);
-
-      const rowState = getValidationState(row);
-      const colState = getValidationState(col);
-
-      if (!rowState.isComplete || !colState.isComplete) return false;
+      const col = Array.from({ length: size }).map((_, r) => board[r * size + i]);
+      if (!getValidationState(row).isComplete || !getValidationState(col).isComplete) return false;
     }
     return true;
   }, [size, getValidationState]);
 
-  // --- EFFECTS ---
-
-  useEffect(() => {
-    if (winModalVisible) {
-      const animateStar = (val: Animated.Value, delay: number) => 
-        Animated.spring(val, { toValue: 1, tension: 50, friction: 4, delay, useNativeDriver: true });
-
-      Animated.parallel([
-        animateStar(star1Anim, 0),
-        animateStar(star2Anim, 200),
-        animateStar(star3Anim, 400),
-      ]).start();
-
-      setTimeout(() => {
-        if (nextLevelBtnRef.current) (nextLevelBtnRef.current as any).focus?.();
-      }, 100);
-    } else {
-      star1Anim.setValue(0);
-      star2Anim.setValue(0);
-      star3Anim.setValue(0);
-    }
-  }, [winModalVisible]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const init = async () => {
-      setIsInitializing(true);
-      setWinModalVisible(false);
-      try {
-        const saved = await getLevelState(chapterId, level);
-        if (!isMounted) return;
-        if (!forcedReset && saved && saved.length === levelData.length && saved.includes(0)) {
-          setCells(saved);
-        } else {
-          setCells([...levelData]);
-        }
-      } catch (err) {
-        if (isMounted) setCells([...levelData]);
-      } finally {
-        if (isMounted) setIsInitializing(false);
-      }
-    };
-    init();
-    return () => { isMounted = false; };
-  }, [level, chapterId, levelData, forcedReset]);
-
-  useEffect(() => {
-    if (userHasMoved && !isInitializing && cells.every(c => c !== 0)) {
-      if (checkWin(cells)) {
-        const handleWin = async () => {
-          const finalStars = calculateStars();
-          await saveLevelStars(chapterId, level, finalStars);
-          await unlockNextLevel(chapterId, level);
-          setWinModalVisible(true);
-          setUserHasMoved(false);
-        };
-        handleWin();
-      }
-    }
-  }, [cells, isInitializing, userHasMoved, checkWin]);
-
-  const emptyCellsCount = levelData?.filter((c) => c === 0).length || 1;
-  const goldThreshold = Math.ceil(emptyCellsCount * 1.5);
-  const silverThreshold = Math.ceil(emptyCellsCount * 2.0);
-
-  const calculateStars = useCallback(() => {
-    if (moveCount <= goldThreshold) return 3;
-    if (moveCount <= silverThreshold) return 2;
-    return 1;
-  }, [moveCount, goldThreshold, silverThreshold]);
-
   const cycleCell = (index: number) => {
     if (isInitializing || levelData[index] !== 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setUserHasMoved(true);
     setHistory((prev) => [...prev, [...cells]].slice(-20));
     const newCells = [...cells];
@@ -188,51 +122,74 @@ export default function PuzzleBoard({
     saveLevelState(chapterId, level, newCells);
   };
 
-  const undoMove = () => {
-    if (history.length === 0) return;
-    const prev = history[history.length - 1];
-    setHistory((h) => h.slice(0, -1));
-    setCells(prev);
-    setMoveCount((m) => m + 1);
-    saveLevelState(chapterId, level, prev);
-  };
+  // --- EFFECTS ---
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      setIsInitializing(true);
+      setWinModalVisible(false);
+      setMoveCount(0);
+      starAnims.forEach(a => a.setValue(0));
+      const saved = await getLevelState(chapterId, level);
+      if (isMounted) {
+        setCells(!forcedReset && saved && saved.length === levelData.length && saved.includes(0) ? saved : [...levelData]);
+        setIsInitializing(false);
+      }
+    };
+    init();
+    return () => { isMounted = false; };
+  }, [level, chapterId, levelData, forcedReset]);
 
-  const giveHint = () => {
-    if (hintsLeft <= 0) return;
-    const emptyIdx = cells.findIndex((c) => c === 0);
-    if (emptyIdx === -1) return;
-    setHintIndex(emptyIdx);
-    setHintsLeft(h => h - 1);
-    Animated.sequence([
-      Animated.timing(hintPulse, { toValue: 1.2, duration: 300, useNativeDriver: true }),
-      Animated.timing(hintPulse, { toValue: 1.0, duration: 300, useNativeDriver: true }),
-    ]).start(() => setHintIndex(null));
-  };
+  useEffect(() => {
+    if (userHasMoved && !isInitializing && cells.every(c => c !== 0)) {
+      if (checkWin(cells)) {
+        (async () => {
+          const stars = (moveCount <= Math.ceil((levelData.filter(c => c === 0).length || 1) * 1.6)) ? 3 : 2;
+          setStarsEarned(stars);
+          await saveLevelStars(chapterId, level, stars);
+          await unlockNextLevel(chapterId, level);
+          
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setWinModalVisible(true);
+          setUserHasMoved(false);
 
-  if (isInitializing) {
-    return <View style={styles.container}><Text>Loading...</Text></View>;
-  }
+          // Animate stars
+          const animations = starAnims.slice(0, stars).map((anim, i) => 
+            Animated.spring(anim, { toValue: 1, tension: 40, friction: 5, delay: i * 200, useNativeDriver: true })
+          );
+          Animated.parallel(animations).start();
+        })();
+      } else {
+        triggerShake();
+      }
+    }
+  }, [cells]);
 
-  const starsEarned = calculateStars();
+  if (isInitializing) return <View style={styles.container}><Text>Loading...</Text></View>;
 
   return (
     <SafeAreaView style={styles.container}>
-      <Modal transparent visible={winModalVisible} animationType="fade">
+      {/* WIN MODAL */}
+      <Modal visible={winModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>LEVEL COMPLETE</Text>
+            <Text style={styles.winTitle}>Level Complete!</Text>
             <View style={styles.starRow}>
-              {[star1Anim, star2Anim, star3Anim].map((anim, idx) => (
-                <Animated.Text 
-                  key={idx} 
-                  style={[styles.starIcon, { transform: [{ scale: anim }], color: (idx + 1) <= starsEarned ? "#fcc419" : "#e9ecef" }]}
-                >
-                  ★
+              {starAnims.map((anim, i) => (
+                <Animated.Text key={i} style={[styles.starText, { transform: [{ scale: anim }], opacity: anim }]}>
+                  ⭐
                 </Animated.Text>
               ))}
             </View>
-            <TouchableOpacity ref={nextLevelBtnRef} style={styles.modalButton} onPress={onNextLevel}>
-              <Text style={styles.modalButtonText}>NEXT LEVEL</Text>
+            <Text style={styles.statsText}>Moves: {moveCount}</Text>
+            <TouchableOpacity 
+              style={styles.nextButton} 
+              onPress={() => {
+                setWinModalVisible(false);
+                onNextLevel();
+              }}
+            >
+              <Text style={styles.nextButtonText}>Next Level</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -242,42 +199,32 @@ export default function PuzzleBoard({
         <Text style={styles.moveText}>MOVES: {moveCount}</Text>
       </View>
 
-      <View style={[styles.gameWrapper, { opacity: winModalVisible ? 0.5 : 1 }]}>
- {/* Column Indicators */}
-<View style={{ flexDirection: "row" }}>
-  <View style={{ width: INDICATOR_WIDTH }} />
-  <View style={{ flexDirection: 'row', width: boardSize }}>
-    {Array.from({ length: size }).map((_, colIdx) => {
-      const col = Array.from({ length: size }).map((_, r) => cells[r * size + colIdx]);
-      const { isInvalid, isComplete, counts } = getValidationState(col);
-      return (
-        <View key={colIdx} style={{ width: cellSize, alignItems: "center" }}>
-          <Text style={[
-            styles.indicatorText, 
-            isInvalid && { color: "#fa5252" },
-            isComplete && { color: "#40c057" }
-          ]}>
-            {counts.one}|{counts.two}
-          </Text>
+      <Animated.View style={[styles.gameWrapper, { transform: [{ translateX: shakeAnim }] }]}>
+        <View style={{ flexDirection: "row", marginBottom: 8 }}>
+          <View style={{ width: INDICATOR_WIDTH }} />
+          <View style={{ flexDirection: 'row', width: boardSize }}>
+            {Array.from({ length: size }).map((_, colIdx) => {
+              const col = Array.from({ length: size }).map((_, r) => cells[r * size + colIdx]);
+              const { isInvalid, isComplete, counts } = getValidationState(col);
+              return (
+                <View key={colIdx} style={{ width: cellSize, alignItems: "center" }}>
+                  <Text style={[styles.indicatorText, isInvalid && { color: "#fa5252" }, isComplete && { color: "#40c057" }]}>
+                    {counts.one}{"\n"}{counts.two}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
-      );
-    })}
-  </View>
-</View>
 
-        <View style={[styles.boardContainer, { marginLeft: -VISUAL_OFFSET }]}>
-          {/* Row Indicators */}
-          <View style={styles.rowIndicators}>
+        <View style={styles.boardContainer}>
+          <View style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}>
             {Array.from({ length: size }).map((_, rowIdx) => {
               const row = cells.slice(rowIdx * size, (rowIdx + 1) * size);
               const { isInvalid, isComplete, counts } = getValidationState(row);
               return (
                 <View key={rowIdx} style={{ height: cellSize, justifyContent: "center" }}>
-                  <Text style={[
-                    styles.indicatorText, 
-                    isInvalid && { color: "#fa5252" },
-                    isComplete && { color: "#40c057" }
-                  ]}>
+                  <Text style={[styles.indicatorText, { textAlign: 'right', paddingRight: 8 }, isInvalid && { color: "#fa5252" }, isComplete && { color: "#40c057" }]}>
                     {counts.one}|{counts.two}
                   </Text>
                 </View>
@@ -288,40 +235,25 @@ export default function PuzzleBoard({
           <View style={[styles.board, { width: boardSize, height: boardSize }]}>
             {cells.map((val, i) => {
               const isFixed = levelData[i] !== 0;
-              const isHinted = hintIndex === i;
               return (
-                <TouchableOpacity 
-                  key={i} 
-                  onPress={() => cycleCell(i)} 
-                  disabled={isFixed}
-                  style={{ width: cellSize, height: cellSize }}
-                >
-                  <ImageBackground 
-                    source={theme?.tileBg} 
-                    style={styles.fullCell}
-                    imageStyle={{ opacity: isFixed ? 0.5 : 1, borderRadius: 4 }}
-                  >
+                <TouchableOpacity key={i} onPress={() => cycleCell(i)} disabled={isFixed} style={{ width: cellSize, height: cellSize, padding: 2 }}>
+                  <ImageBackground source={theme?.tileBg} style={styles.fullCell} imageStyle={{ opacity: isFixed ? 0.4 : 1, borderRadius: 6 }}>
                     {val !== 0 && (
-                      <Image 
-                        source={val === 1 ? theme.shape1 : theme.shape2} 
-                        style={{ width: cellSize * 0.7, height: cellSize * 0.7 }} 
-                        resizeMode="contain" 
-                      />
+                      <Image source={val === 1 ? theme.shape1 : theme.shape2} style={{ width: cellSize * 0.6, height: cellSize * 0.6 }} resizeMode="contain" />
                     )}
-                    {isHinted && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(252, 196, 25, 0.3)' }]} />}
                   </ImageBackground>
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.actionButton} onPress={undoMove}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setHistory(h => h.length > 0 ? (setCells(h[h.length-1]), h.slice(0,-1)) : h)}>
           <Text style={styles.buttonText}>Undo</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#fcc419' }]} onPress={giveHint}>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#fcc419' }]} onPress={() => setHintsLeft(h => h > 0 ? (Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), h-1) : h)}>
           <Text style={styles.buttonText}>Hint ({hintsLeft})</Text>
         </TouchableOpacity>
       </View>
@@ -333,21 +265,22 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   header: { marginBottom: 20 },
   moveText: { fontSize: 20, fontWeight: "bold", color: "#495057" },
-  gameWrapper: { alignItems: "center", justifyContent: "center", width: '100%' },
+  gameWrapper: { alignItems: "center" },
   boardContainer: { flexDirection: "row", alignItems: "center" },
-  columnIndicators: { flexDirection: "row", marginBottom: 5 },
-  rowIndicators: { width: 40, paddingRight: 5, alignItems: 'flex-end' },
-  indicatorText: { fontSize: 12, fontWeight: "bold", color: "#868e96" },
-  board: { flexDirection: "row", flexWrap: "wrap", backgroundColor: "#dee2e6", borderRadius: 8, overflow: "hidden" },
+  rowIndicators: { alignItems: 'flex-end' },
+  indicatorText: { fontSize: 11, fontWeight: "bold", color: "#adb5bd", lineHeight: 12 },
+  board: { flexDirection: "row", flexWrap: "wrap", backgroundColor: "#f1f3f5", borderRadius: 12, overflow: "hidden", elevation: 4 },
   fullCell: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
-  buttonRow: { flexDirection: "row", marginTop: 30, gap: 20 },
-  actionButton: { paddingVertical: 12, paddingHorizontal: 25, backgroundColor: "#adb5bd", borderRadius: 10 },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
-  modalContent: { backgroundColor: "#fff", padding: 30, borderRadius: 20, alignItems: "center", width: '80%' },
-  modalTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-  starRow: { flexDirection: "row", marginBottom: 20 },
-  starIcon: { fontSize: 40, marginHorizontal: 5 },
-  modalButton: { backgroundColor: "#4dabf7", paddingVertical: 12, paddingHorizontal: 30, borderRadius: 10 },
-  modalButtonText: { color: "#fff", fontWeight: "bold" },
+  buttonRow: { flexDirection: "row", marginTop: 40, gap: 15 },
+  actionButton: { paddingVertical: 12, paddingHorizontal: 24, backgroundColor: "#dee2e6", borderRadius: 12 },
+  buttonText: { fontWeight: "bold", color: "#495057" },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
+  modalContent: { backgroundColor: "white", padding: 30, borderRadius: 20, alignItems: "center", width: "80%" },
+  winTitle: { fontSize: 28, fontWeight: "bold", marginBottom: 20, color: "#2f9e44" },
+  starRow: { flexDirection: "row", marginBottom: 20, gap: 10 },
+  starText: { fontSize: 40 },
+  statsText: { fontSize: 18, color: "#495057", marginBottom: 30 },
+  nextButton: { backgroundColor: "#228be6", paddingVertical: 15, paddingHorizontal: 40, borderRadius: 30 },
+  nextButtonText: { color: "white", fontSize: 18, fontWeight: "bold" },
 });

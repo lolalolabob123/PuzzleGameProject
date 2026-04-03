@@ -1,132 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { useIsFocused } from '@react-navigation/native';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
-import { getLevelStars } from '../utils/progress';
-import { StackScreenProps } from '@react-navigation/stack';
-import { chapters } from '../data/chapters'; // Import your data
+import React from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Dimensions,
+  ActivityIndicator 
+} from 'react-native';
 
-type RootStackParamList = {
-  LevelSelect: { chapterId: number };
-  Game: {
-    levelId: number;
-    chapterId: number;
-    themeIndex?: number;
-    forcedReset?: boolean;
-  };
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const NUM_COLUMNS = 4;
+const SCREEN_PADDING = 20;
+const COLUMN_GAP = 15;
 
-type Props = StackScreenProps<RootStackParamList, 'LevelSelect'>;
+const availableWidth = SCREEN_WIDTH - (SCREEN_PADDING * 2) - (COLUMN_GAP * (NUM_COLUMNS - 1));
+const ITEM_SIZE = Math.floor(availableWidth / NUM_COLUMNS);
 
-export default function LevelSelect({ navigation, route }: Props) {
-  const chapterId = route.params?.chapterId ?? 0; // Chapters are usually 0-indexed in arrays
-  const [levelData, setLevelData] = useState<{ [key: number]: number }>({});
-  const isFocused = useIsFocused();
-
-  // Get ACTUAL levels from your data file
-  const currentChapter = chapters[chapterId];
-  const actualLevels = currentChapter?.levels || [];
-
-  const loadStars = async () => {
-    const data: { [key: number]: number } = {};
-    await Promise.all(
-      actualLevels.map(async (lvl) => {
-        const stars = await getLevelStars(chapterId, lvl.id);
-        data[lvl.id] = stars || 0;
-      })
-    );
-    setLevelData(data);
-  };
-
-  useEffect(() => {
-    if (isFocused) loadStars();
-  }, [isFocused, chapterId]);
-
-  const renderLevel = ({ item: levelObj }: { item: typeof actualLevels[0] }) => {
-    const levelId = levelObj.id;
-    const stars = levelData[levelId] || 0;
-
-    // Logic: Unlocked if it's level 1, or if the previous level has stars
-    const currentIndex = actualLevels.findIndex(l => l.id === levelId);
-    const isUnlocked = currentIndex === 0 || (levelData[actualLevels[currentIndex - 1].id] > 0);
-
+export default function LevelSelect({ levels, onSelectLevel }: any) {
+  
+  // 1. Handle the "Waiting for Data" state
+  if (levels === undefined) {
     return (
-      <TouchableOpacity
-        style={[styles.levelCard, !isUnlocked && { opacity: 0.5 }]}
-        disabled={!isUnlocked}
-        onPress={() => navigation.navigate('Game', { levelId: levelId, chapterId })}
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator size="large" color="#228be6" />
+        <Text style={{ marginTop: 10, color: '#868e96' }}>Loading Levels...</Text>
+      </View>
+    );
+  }
+
+  // 2. Handle the "Truly Empty" state
+  if (levels.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={{ color: '#868e96' }}>No levels available for this chapter.</Text>
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }: any) => {
+    // Flexible key checking
+    const displayNum = item.levelNumber ?? item.level ?? item.num ?? "?";
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.levelButton, { width: ITEM_SIZE, height: ITEM_SIZE }]}
+        onPress={() => onSelectLevel(item)}
+        activeOpacity={0.7}
       >
-        {isUnlocked ? (
-          <>
-            <Text style={styles.levelNumber}>{levelId}</Text>
-            <View style={styles.starContainer}>
-              {[1, 2, 3].map((s) => (
-                <Text key={s} style={[styles.smallStar, { color: s <= stars ? '#fcc419' : '#dee2e6' }]}>★</Text>
-              ))}
-            </View>
-          </>
-        ) : (
-          <Text style={{ fontSize: 20 }}>🔒</Text>
-        )}
+        <Text style={styles.levelText}>{displayNum}</Text>
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{currentChapter?.title || 'Select Level'}</Text>
       <FlatList
-        data={actualLevels}
-        renderItem={renderLevel}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={4}
+        data={levels}
+        renderItem={renderItem}
+        keyExtractor={(item, index) => (item.id || index).toString()}
+        numColumns={NUM_COLUMNS}
         contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.columnWrapper}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
 }
-// ... styles stay the same
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    padding: 20
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#212529',
-    marginBottom: 20,
-    textAlign: 'center'
-  },
-  listContent: {
-    paddingBottom: 40
-  },
-  levelCard: {
-    width: 75,
-    height: 90,
-    backgroundColor: '#fff',
-    margin: 10,
-    borderRadius: 15,
+  container: { flex: 1, backgroundColor: '#fff' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  listContent: { paddingHorizontal: SCREEN_PADDING, paddingTop: 20, paddingBottom: 40 },
+  columnWrapper: { justifyContent: 'flex-start', gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
+  levelButton: {
+    backgroundColor: '#f1f3f5',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  levelNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#495057'
-  },
-  starContainer: {
-    flexDirection: 'row',
-    marginTop: 5
-  },
-  smallStar: {
-    fontSize: 14,
-    marginHorizontal: 1
-  },
+  levelText: { fontSize: 18, fontWeight: 'bold', color: '#495057' },
 });
