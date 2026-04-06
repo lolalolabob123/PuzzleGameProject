@@ -91,7 +91,7 @@ export default function PuzzleBoard({
   }, [limit, size]);
 
   const triggerShake = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
@@ -112,7 +112,7 @@ export default function PuzzleBoard({
 
   const cycleCell = (index: number) => {
     if (isInitializing || levelData[index] !== 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setUserHasMoved(true);
     setHistory((prev) => [...prev, [...cells]].slice(-20));
     const newCells = [...cells];
@@ -120,6 +120,13 @@ export default function PuzzleBoard({
     setCells(newCells);
     setMoveCount((prev) => prev + 1);
     saveLevelState(chapterId, level, newCells);
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const lastState = history[history.length - 1];
+    setCells(lastState);
+    setHistory((prev) => prev.slice(0, -1));
   };
 
   // --- EFFECTS ---
@@ -149,11 +156,10 @@ export default function PuzzleBoard({
           await saveLevelStars(chapterId, level, stars);
           await unlockNextLevel(chapterId, level);
           
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setWinModalVisible(true);
           setUserHasMoved(false);
 
-          // Animate stars
           const animations = starAnims.slice(0, stars).map((anim, i) => 
             Animated.spring(anim, { toValue: 1, tension: 40, friction: 5, delay: i * 200, useNativeDriver: true })
           );
@@ -169,7 +175,6 @@ export default function PuzzleBoard({
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* WIN MODAL */}
       <Modal visible={winModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -205,6 +210,7 @@ export default function PuzzleBoard({
           <View style={{ flexDirection: 'row', width: boardSize }}>
             {Array.from({ length: size }).map((_, colIdx) => {
               const col = Array.from({ length: size }).map((_, r) => cells[r * size + colIdx]);
+              // FIXED: Correct destructuring initializer
               const { isInvalid, isComplete, counts } = getValidationState(col);
               return (
                 <View key={colIdx} style={{ width: cellSize, alignItems: "center" }}>
@@ -221,6 +227,7 @@ export default function PuzzleBoard({
           <View style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}>
             {Array.from({ length: size }).map((_, rowIdx) => {
               const row = cells.slice(rowIdx * size, (rowIdx + 1) * size);
+              // FIXED: Correct destructuring initializer
               const { isInvalid, isComplete, counts } = getValidationState(row);
               return (
                 <View key={rowIdx} style={{ height: cellSize, justifyContent: "center" }}>
@@ -250,10 +257,18 @@ export default function PuzzleBoard({
       </Animated.View>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => setHistory(h => h.length > 0 ? (setCells(h[h.length-1]), h.slice(0,-1)) : h)}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleUndo}>
           <Text style={styles.buttonText}>Undo</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#fcc419' }]} onPress={() => setHintsLeft(h => h > 0 ? (Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), h-1) : h)}>
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: '#fcc419' }]} 
+          onPress={() => {
+            if (hintsLeft > 0) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              setHintsLeft(h => h - 1);
+            }
+          }}
+        >
           <Text style={styles.buttonText}>Hint ({hintsLeft})</Text>
         </TouchableOpacity>
       </View>
@@ -274,7 +289,6 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: "row", marginTop: 40, gap: 15 },
   actionButton: { paddingVertical: 12, paddingHorizontal: 24, backgroundColor: "#dee2e6", borderRadius: 12 },
   buttonText: { fontWeight: "bold", color: "#495057" },
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
   modalContent: { backgroundColor: "white", padding: 30, borderRadius: 20, alignItems: "center", width: "80%" },
   winTitle: { fontSize: 28, fontWeight: "bold", marginBottom: 20, color: "#2f9e44" },

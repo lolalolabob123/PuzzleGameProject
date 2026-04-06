@@ -38,20 +38,30 @@ export default function LevelSelect({ levels, onSelectLevel }: any) {
     );
   }
 
-  const renderItem = ({ item }: any) => {
-    // Flexible key checking
-    const displayNum = item.levelNumber ?? item.level ?? item.num ?? "?";
-    
-    return (
-      <TouchableOpacity 
-        style={[styles.levelButton, { width: ITEM_SIZE, height: ITEM_SIZE }]}
-        onPress={() => onSelectLevel(item)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.levelText}>{displayNum}</Text>
-      </TouchableOpacity>
-    );
-  };
+const renderItem = ({ item }: any) => {
+  const displayNum = item.id ?? "?";
+  const stars = item.stars || 0;
+  
+  return (
+    <TouchableOpacity 
+      style={[styles.levelButton, { width: ITEM_SIZE, height: ITEM_SIZE }]}
+      onPress={() => onSelectLevel(item)}
+    >
+      <Text style={styles.levelText}>{displayNum}</Text>
+      
+      <View style={{ flexDirection: 'row', marginTop: 4 }}>
+        {[1, 2, 3].map((s) => (
+          <Text 
+            key={s} 
+            style={{ fontSize: 10, color: s <= stars ? "#fcc419" : "#dee2e6" }}
+          >
+            ⭐
+          </Text>
+        ))}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
   return (
     <View style={styles.container}>
@@ -85,4 +95,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   levelText: { fontSize: 18, fontWeight: 'bold', color: '#495057' },
+  starRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+    gap: 2
+  },
+  starIcon: {
+    fontSize: 10,
+  }
 });

@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "./tabs/Home";
 import ChapterSelect from "./tabs/ChapterSelect";
-import LevelSelect from "./components/LevelSelect";
+import LevelModalScreen from "./screens/LevelModal";
 import GameScreen from './components/GameScreen'
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RootStackParamList, TabParamList } from "./navigation/types";
@@ -64,7 +64,7 @@ export default function App() {
             <RootStack.Group screenOptions={{ presentation: 'modal' }}>
               <RootStack.Screen
                 name="LevelModal"
-                component={LevelSelect}
+                component={LevelModalScreen}
                 options={{ title: 'Select a Level' }} 
               />
             </RootStack.Group>

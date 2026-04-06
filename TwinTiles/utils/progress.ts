@@ -50,35 +50,46 @@ export const resetChapterProgress = async (chapterId: number) => {
   try {
     const rawProgress = await AsyncStorage.getItem(PROGRESS_KEY);
     let progress = rawProgress ? JSON.parse(rawProgress) : {};
+    
     progress[`chapter_${chapterId}`] = 1;
     await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
 
     const allKeys = await AsyncStorage.getAllKeys();
-    const statesToClear = allKeys.filter(key => 
-      key.startsWith(`level_state_${chapterId}_`)
+
+    const keysToRemove = allKeys.filter(key => 
+      key.startsWith(`level_state_${chapterId}_`) || 
+      key.startsWith(`stars_${chapterId}_`)
     );
 
-    if (statesToClear.length > 0) {
-      await AsyncStorage.multiRemove(statesToClear);
+    if (keysToRemove.length > 0) {
+      await AsyncStorage.multiRemove(keysToRemove);
     }
 
-    console.log(`Chapter ${chapterId} fully wiped: progress and board states.`);
+    console.log(`Chapter ${chapterId} wiped: progress, states, and stars.`);
   } catch (e) {
     console.error("Failed to fully reset chapter", e);
   }
 };
+
 export const clearAllGameData = async () => {
   try {
     const keys = await AsyncStorage.getAllKeys();
+    
+    // Identify every key used by the app
     const gameKeys = keys.filter(key => 
-      key.startsWith('chapter_') || 
-      key.startsWith('level_state_') || 
+      key.startsWith('chapter_') ||
+      key.startsWith('level_state_') ||
+      key.startsWith('stars_') ||
       key === 'GAME_PROGRESS'
     );
-    await AsyncStorage.multiRemove(gameKeys);
-    console.log("All game data wiped.");
+    
+    if (gameKeys.length > 0) {
+      await AsyncStorage.multiRemove(gameKeys);
+    }
+    
+    console.log("Global reset: All game data and stars wiped.");
   } catch (e) {
-    console.error("Failed to clear game data", e);
+    console.error("Failed to clear all game data", e);
   }
 };
 
