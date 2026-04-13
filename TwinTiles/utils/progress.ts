@@ -127,7 +127,7 @@ export const getLevelStars = async (chapterId: number, level: number): Promise<n
 
   const parsed = stars ? parseInt(stars, 10) : 0;
 
-  // ✅ Debug
+  // ✅ Debug 
   console.log(`READ STORAGE → ${key}:`, parsed);
 
   return parsed;

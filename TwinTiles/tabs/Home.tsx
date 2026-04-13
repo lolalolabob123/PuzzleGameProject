@@ -35,10 +35,11 @@ const universalNotify = (title: string, message: string) => {
 export default function HomeScreen({ navigation }: any) {
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [infoVisible, setInfoVisible] = useState(false)
   const { themeIndex, setTheme } = useTheme();
   const currentTheme = AVAILABLE_THEMES[themeIndex];
 
-const handleResetChapter = () => {
+  const handleResetChapter = () => {
     universalAlert(
       "Reset Progress",
       "Are you sure you want to reset Chapter 1?",
@@ -50,8 +51,8 @@ const handleResetChapter = () => {
         // 2. Refresh the UI by re-navigating with a new key
         // This targets the RootStack, not the Tab stack
         setTimeout(() => {
-          navigation.navigate("LevelModal", { 
-            chapterId: 1, 
+          navigation.navigate("LevelModal", {
+            chapterId: 1,
             themeIndex: themeIndex,
             refreshKey: Date.now().toString() // This kills the old view cache
           });
@@ -61,6 +62,7 @@ const handleResetChapter = () => {
       true
     );
   };
+
   const handleFullReset = () => {
     universalAlert(
       "Wipe All Data",
@@ -91,19 +93,52 @@ const handleResetChapter = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topNav}>
-        <TouchableOpacity><FontAwesome name="info-circle" size={30} color="black" /></TouchableOpacity>
+        <TouchableOpacity onPress={() => setInfoVisible(true)}>
+          <FontAwesome name="info-circle" size={30} color="black" />
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={() => setProfileMenuVisible(true)}>
           <FontAwesome name="user-circle" size={40} color="black" />
         </TouchableOpacity>
       </View>
-      <View style={styles.rankContainer}><Text style={styles.rankText}>Rank</Text></View>
+      <View style={styles.rankContainer}>
+        <Text style={styles.rankText}>Rank</Text>
+      </View>
+
       {renderProfileMenu()}
+
+      <Modal visible={infoVisible} animationType="slide" presentationStyle="pageSheet">
+        <HowToPlay onClose={() => setInfoVisible(false)}/>
+      </Modal>
+
       <Modal visible={settingsVisible} animationType="slide" presentationStyle="pageSheet">
         <SettingsContent currentTheme={currentTheme} onThemeSelect={setTheme} onClose={() => setSettingsVisible(false)} />
       </Modal>
     </SafeAreaView>
   );
 }
+
+const HowToPlay = ({ onClose }: any) => (
+  <View style={styles.settingsPage}>
+    <View style={styles.settingsHeader}>
+      <Text style={styles.settingsTitle}>How to Play</Text>
+      <TouchableOpacity onPress={onClose}><Text style={styles.doneButton}>Close</Text></TouchableOpacity>
+    </View>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Rule title="1. Equal Distribution" detail="Each row and column must contain an equal number of both symbols." />
+      <Rule title="2. No Three-in-a-Row" detail="There cannot be more than two of the same color directly next to each other, horizontally or vertically." />
+      <Rule title="3. Unique Rows/Cols" detail="No two rows or columns can be identical (for larger puzzles)." />
+      <Rule title="4. Move Limit" detail="Solve the puzzle in as few moves as possible to earn 3 stars!" />
+    </ScrollView>
+  </View>
+);
+
+const Rule = ({ title, detail }: { title: string, detail: string }) => (
+  <View style={styles.ruleItem}>
+    <Text style={styles.ruleTitle}>{title}</Text>
+    <Text style={styles.ruleDetail}>{detail}</Text>
+  </View>
+);
 
 const MenuOption = ({ icon, label, onPress, color = "#444" }: any) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -156,4 +191,7 @@ const styles = StyleSheet.create({
   previewContainer: { flexDirection: 'row', marginBottom: 10 },
   miniShape: { width: 30, height: 30, marginHorizontal: 3 },
   themeLabel: { fontSize: 14, fontWeight: '600', color: '#495057' },
+  ruleItem: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#4dabf7' },
+  ruleTitle: { fontSize: 16, fontWeight: 'bold', color: '#343a40', marginBottom: 5 },
+  ruleDetail: { fontSize: 14, color: '#868e96', lineHeight: 20 },
 });

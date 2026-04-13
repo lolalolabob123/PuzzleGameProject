@@ -9,17 +9,11 @@ import {
   ActivityIndicator
 } from 'react-native';
 
-// --------------------
-// Types
-// --------------------
 type LevelItem = {
   id: number;
   stars?: number;
 };
 
-// --------------------
-// Layout constants
-// --------------------
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const NUM_COLUMNS = 4;
 const SCREEN_PADDING = 20;
@@ -32,20 +26,15 @@ const availableWidth =
 
 const ITEM_SIZE = Math.floor(availableWidth / NUM_COLUMNS);
 
-// --------------------
-// Level Button
-// --------------------
-const LevelButton = ({
-  item,
-  onPress
-}: {
+const LevelButton = ({ item, onPress }: {
   item: LevelItem;
   onPress: (level: LevelItem) => void;
 }) => {
-  const displayNum = item.id ?? "?";
-
-  // ✅ safe + consistent
+  console.log(`LevelButton ${item.id} → stars prop:`, item.stars);
   const stars = Number(item.stars ?? 0);
+  console.log(`LevelButton ${item.id} → stars after Number():`, stars);
+
+  const displayNum = item.id ?? "?";
 
   return (
     <TouchableOpacity
@@ -53,7 +42,6 @@ const LevelButton = ({
       onPress={() => onPress(item)}
     >
       <Text style={styles.levelText}>{displayNum}</Text>
-
       <View style={styles.starRow}>
         {[1, 2, 3].map((s) => (
           <Text
@@ -63,7 +51,7 @@ const LevelButton = ({
               { color: s <= stars ? "#fcc419" : "#dee2e6" }
             ]}
           >
-            ⭐
+            ★
           </Text>
         ))}
       </View>
@@ -71,9 +59,6 @@ const LevelButton = ({
   );
 };
 
-// --------------------
-// Main Component
-// --------------------
 export default function LevelSelect({
   levels,
   onSelectLevel
@@ -81,7 +66,6 @@ export default function LevelSelect({
   levels: LevelItem[];
   onSelectLevel: (level: LevelItem) => void;
 }) {
-
   if (levels === undefined) {
     return (
       <View style={styles.emptyContainer}>
@@ -103,18 +87,11 @@ export default function LevelSelect({
     <View style={styles.container}>
       <FlatList
         data={levels}
-
-        // ✅ Forces full refresh when stars change
-        key={`list-${levels.map(l => l.stars ?? 0).join("-")}`}
-
         extraData={levels}
         renderItem={({ item }) => (
           <LevelButton item={item} onPress={onSelectLevel} />
         )}
-
-        // ✅ stable + safe key
         keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
-
         numColumns={NUM_COLUMNS}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
@@ -124,34 +101,12 @@ export default function LevelSelect({
   );
 }
 
-// --------------------
-// Styles
-// --------------------
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff'
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  emptyText: {
-    marginTop: 10,
-    color: '#868e96',
-    fontSize: 16
-  },
-  listContent: {
-    paddingHorizontal: SCREEN_PADDING,
-    paddingTop: 20,
-    paddingBottom: 40
-  },
-  columnWrapper: {
-    justifyContent: 'flex-start',
-    gap: COLUMN_GAP,
-    marginBottom: COLUMN_GAP
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { marginTop: 10, color: '#868e96', fontSize: 16 },
+  listContent: { paddingHorizontal: SCREEN_PADDING, paddingTop: 20, paddingBottom: 40 },
+  columnWrapper: { justifyContent: 'flex-start', gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
   levelButton: {
     backgroundColor: '#f1f3f5',
     borderRadius: 12,
@@ -163,17 +118,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4
   },
-  levelText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#495057'
-  },
-  starRow: {
-    flexDirection: 'row',
-    marginTop: 4,
-    gap: 2
-  },
-  starIcon: {
-    fontSize: 10
-  }
+  levelText: { fontSize: 18, fontWeight: 'bold', color: '#495057' },
+  starRow: { flexDirection: 'row', marginTop: 4, gap: 2 },
+  starIcon: { fontSize: 10 }
 });
