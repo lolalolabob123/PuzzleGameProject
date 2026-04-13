@@ -12,12 +12,13 @@ export type RootStackParamList = {
   Game: {
     chapterId: number;
     levelId: number;
-    forcedReset?: boolean;
     themeIndex: number;
+    forcedReset?: boolean; // Fixed the missing property
   };
   LevelModal: {
     chapterId: number;
     themeIndex: number;
+    refreshKey?: string; // Used to force re-mounting
   };
 };
 

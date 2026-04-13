@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Image, Alert, Platform, LogBox } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from "@expo/vector-icons";
+import { CommonActions } from '@react-navigation/native';
 import { AVAILABLE_THEMES } from "../constants/themes";
 import { useTheme } from "../context/ThemeContext";
 import { resetChapterProgress, clearAllGameData } from "../utils/progress";
@@ -9,189 +10,138 @@ import { resetChapterProgress, clearAllGameData } from "../utils/progress";
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
   console.warn = (...args) => {
-    if (args[0] && typeof args[0] === 'string' && args[0].includes('shadow*')) return;
+    if (args[0]?.toString().includes('shadow*')) return;
     originalWarn(...args);
   };
 } else {
   LogBox.ignoreLogs(['shadow*']);
 }
 
-export default function HomeScreen() {
+const universalAlert = (title: string, message: string, onConfirm: () => void, isDestructive = false) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Confirm", style: isDestructive ? "destructive" : "default", onPress: onConfirm }
+    ]);
+  }
+};
+
+const universalNotify = (title: string, message: string) => {
+  Platform.OS === 'web' ? window.alert(message) : Alert.alert(title, message);
+};
+
+export default function HomeScreen({ navigation }: any) {
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-
   const { themeIndex, setTheme } = useTheme();
   const currentTheme = AVAILABLE_THEMES[themeIndex];
 
-  const handleReset = () => {
-    const title = "Reset Progress";
-    const message = "Are you sure you want to reset Chapter 1? This cannot be undone.";
+const handleResetChapter = () => {
+    universalAlert(
+      "Reset Progress",
+      "Are you sure you want to reset Chapter 1?",
+      async () => {
+        // 1. Clear the actual data
+        await resetChapterProgress(1);
+        setProfileMenuVisible(false);
 
-    if (Platform.OS === 'web') {
-      // Use browser confirm for web
-      const confirmed = window.confirm(`${title}\n\n${message}`);
-      if (confirmed) performReset();
-    } else {
-      // Use native Alert for mobile
-      Alert.alert(title, message, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Reset", style: "destructive", onPress: performReset }
-      ]);
-    }
+        // 2. Refresh the UI by re-navigating with a new key
+        // This targets the RootStack, not the Tab stack
+        setTimeout(() => {
+          navigation.navigate("LevelModal", { 
+            chapterId: 1, 
+            themeIndex: themeIndex,
+            refreshKey: Date.now().toString() // This kills the old view cache
+          });
+          universalNotify("Success", "Progress reset.");
+        }, 150);
+      },
+      true
+    );
   };
-
-  const performReset = async () => {
-    try {
-      await resetChapterProgress(1);
-      setProfileMenuVisible(false);
-
-      const successMsg = "Progress has been reset to level 1.";
-      if (Platform.OS === 'web') {
-        window.alert(successMsg);
-      } else {
-        Alert.alert("Success", successMsg);
-      }
-    } catch (error) {
-      console.error("Reset failed:", error);
-    }
-  };
-
   const handleFullReset = () => {
-    const title = "Wipe All Data";
-    const message = "This will delete ALL progress and saved level states. This cannot be undone.";
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`${title}\n\n${message}`)) performFullReset();
-    } else {
-      Alert.alert(title, message, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete Everything", style: "destructive", onPress: performFullReset }
-      ]);
-    }
+    universalAlert(
+      "Wipe All Data",
+      "This will delete ALL progress.",
+      async () => {
+        await clearAllGameData();
+        setProfileMenuVisible(false);
+        universalNotify("Deleted", "Data cleared.");
+      },
+      true
+    );
   };
 
-  const performFullReset = async () => {
-    await clearAllGameData();
-    setProfileMenuVisible(false);
-    const msg = "All data has been cleared.";
-    Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Deleted", msg);
-  };
+  const renderProfileMenu = () => (
+    <Modal visible={profileMenuVisible} transparent animationType="fade">
+      <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
+        <View style={styles.profileMenu}>
+          <MenuOption icon="cog" label="Settings" onPress={() => { setProfileMenuVisible(false); setSettingsVisible(true); }} />
+          <View style={styles.menuDivider} />
+          <MenuOption icon="refresh" label="Reset Chapter 1" color="#f08c00" onPress={handleResetChapter} />
+          <View style={styles.menuDivider} />
+          <MenuOption icon="trash" label="Clear All Data" color="#ff6b6b" onPress={handleFullReset} />
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topNav}>
-        <TouchableOpacity onPress={() => { /* Info logic */ }}>
-          <FontAwesome name="info-circle" size={30} color="black" />
-        </TouchableOpacity>
+        <TouchableOpacity><FontAwesome name="info-circle" size={30} color="black" /></TouchableOpacity>
         <TouchableOpacity onPress={() => setProfileMenuVisible(true)}>
           <FontAwesome name="user-circle" size={40} color="black" />
         </TouchableOpacity>
       </View>
-
-      <View style={styles.rankContainer}>
-        <Text style={styles.rankText}>Rank</Text>
-      </View>
-
-      <Modal visible={profileMenuVisible} transparent={true} animationType="fade">
-        <TouchableOpacity
-          style={styles.menuOverlay}
-          activeOpacity={1}
-          onPress={() => setProfileMenuVisible(false)}
-        >
-          <View style={styles.profileMenu}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setProfileMenuVisible(false);
-                setSettingsVisible(true);
-              }}
-            >
-              <FontAwesome name="cog" size={18} color="#444" />
-              <Text style={styles.menuText}>Settings</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity style={styles.menuItem} onPress={handleReset}>
-              <FontAwesome name="refresh" size={18} color="#f08c00" />
-              <Text style={[styles.menuText, { color: "#f08c00" }]}>Reset Chapter 1</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity style={styles.menuItem} onPress={handleFullReset}>
-              <FontAwesome name="trash" size={18} color="#ff6b6b" />
-              <Text style={[styles.menuText, { color: "#ff6b6b" }]}>Clear All Data</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity style={styles.menuItem} onPress={() => setProfileMenuVisible(false)}>
-              <FontAwesome name="sign-out" size={18} color="#ff6b6b" />
-              <Text style={[styles.menuText, { color: "#ff6b6b" }]}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Settings Modal - Remains Same */}
+      <View style={styles.rankContainer}><Text style={styles.rankText}>Rank</Text></View>
+      {renderProfileMenu()}
       <Modal visible={settingsVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.settingsPage}>
-          <View style={styles.settingsHeader}>
-            <Text style={styles.settingsTitle}>Settings</Text>
-            <TouchableOpacity onPress={() => setSettingsVisible(false)}>
-              <Text style={styles.doneButton}>Done</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
-            <View style={styles.themeGrid}>
-              {AVAILABLE_THEMES.map((theme, index) => (
-                <TouchableOpacity
-                  key={theme.id}
-                  style={[styles.themeCard, currentTheme.id === theme.id && styles.activeCard]}
-                  onPress={() => setTheme(index)}
-                >
-                  <View style={styles.previewContainer}>
-                    <Image source={theme.shape1} style={styles.miniShape} />
-                    <Image source={theme.shape2} style={styles.miniShape} />
-                  </View>
-                  <Text style={styles.themeLabel}>{theme.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
+        <SettingsContent currentTheme={currentTheme} onThemeSelect={setTheme} onClose={() => setSettingsVisible(false)} />
       </Modal>
     </SafeAreaView>
   );
 }
+
+const MenuOption = ({ icon, label, onPress, color = "#444" }: any) => (
+  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+    <FontAwesome name={icon} size={18} color={color} />
+    <Text style={[styles.menuText, { color }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const SettingsContent = ({ currentTheme, onThemeSelect, onClose }: any) => (
+  <View style={styles.settingsPage}>
+    <View style={styles.settingsHeader}>
+      <Text style={styles.settingsTitle}>Settings</Text>
+      <TouchableOpacity onPress={onClose}><Text style={styles.doneButton}>Done</Text></TouchableOpacity>
+    </View>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
+      <View style={styles.themeGrid}>
+        {AVAILABLE_THEMES.map((theme, index) => (
+          <TouchableOpacity key={theme.id} style={[styles.themeCard, currentTheme.id === theme.id && styles.activeCard]} onPress={() => onThemeSelect(index)}>
+            <View style={styles.previewContainer}>
+              <Image source={theme.shape1} style={styles.miniShape} />
+              <Image source={theme.shape2} style={styles.miniShape} />
+            </View>
+            <Text style={styles.themeLabel}>{theme.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   topNav: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 25, paddingVertical: 15 },
   rankContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   rankText: { fontSize: 24, fontWeight: "bold" },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)', // Slightly darker so it's visible
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end'
-  },
-  profileMenu: {
-    marginTop: 60,
-    marginRight: 20,
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 10,
-    width: 180, // Slightly wider for the text
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-start', alignItems: 'flex-end' },
+  profileMenu: { marginTop: 60, marginRight: 20, backgroundColor: 'white', borderRadius: 15, padding: 10, width: 180, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10 },
   menuText: { marginLeft: 12, fontSize: 16, fontWeight: '500' },
   menuDivider: { height: 1, backgroundColor: '#eee' },

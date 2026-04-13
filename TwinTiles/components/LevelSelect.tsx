@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
   Dimensions,
-  ActivityIndicator 
+  ActivityIndicator
 } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -17,43 +17,26 @@ const COLUMN_GAP = 15;
 const availableWidth = SCREEN_WIDTH - (SCREEN_PADDING * 2) - (COLUMN_GAP * (NUM_COLUMNS - 1));
 const ITEM_SIZE = Math.floor(availableWidth / NUM_COLUMNS);
 
-export default function LevelSelect({ levels, onSelectLevel }: any) {
-  
-  // 1. Handle the "Waiting for Data" state
-  if (levels === undefined) {
-    return (
-      <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" color="#228be6" />
-        <Text style={{ marginTop: 10, color: '#868e96' }}>Loading Levels...</Text>
-      </View>
-    );
-  }
-
-  // 2. Handle the "Truly Empty" state
-  if (levels.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={{ color: '#868e96' }}>No levels available for this chapter.</Text>
-      </View>
-    );
-  }
-
-const renderItem = ({ item }: any) => {
+const LevelButton = ({ item, onPress }: any) => {
   const displayNum = item.id ?? "?";
-  const stars = item.stars || 0;
-  
+  // Fallback to 0 to ensure yellow stars don't persist
+  const stars = Number(item.stars || 0);
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.levelButton, { width: ITEM_SIZE, height: ITEM_SIZE }]}
-      onPress={() => onSelectLevel(item)}
+      onPress={() => onPress(item)}
     >
       <Text style={styles.levelText}>{displayNum}</Text>
-      
-      <View style={{ flexDirection: 'row', marginTop: 4 }}>
+
+      <View style={styles.starRow}>
         {[1, 2, 3].map((s) => (
-          <Text 
-            key={s} 
-            style={{ fontSize: 10, color: s <= stars ? "#fcc419" : "#dee2e6" }}
+          <Text
+            key={s}
+            style={[
+              styles.starIcon,
+              { color: s <= stars ? "#fcc419" : "#dee2e6" }
+            ]}
           >
             ⭐
           </Text>
@@ -63,12 +46,38 @@ const renderItem = ({ item }: any) => {
   );
 };
 
+export default function LevelSelect({ levels, onSelectLevel }: any) {
+
+  if (levels === undefined) {
+    return (
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator size="large" color="#228be6" />
+        <Text style={styles.emptyText}>Loading Levels...</Text>
+      </View>
+    );
+  }
+
+  if (levels.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No levels available.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
         data={levels}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => (item.id || index).toString()}
+
+        // ✅ ADD THIS LINE (very important)
+        key={`list-${levels.map(l => l.stars).join("-")}`}
+
+        extraData={levels}
+        renderItem={({ item }) => (
+          <LevelButton item={item} onPress={onSelectLevel} />
+        )}
+        keyExtractor={(item) => `level-${item.id}-${item.stars}`}
         numColumns={NUM_COLUMNS}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
@@ -81,6 +90,7 @@ const renderItem = ({ item }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { marginTop: 10, color: '#868e96', fontSize: 16 },
   listContent: { paddingHorizontal: SCREEN_PADDING, paddingTop: 20, paddingBottom: 40 },
   columnWrapper: { justifyContent: 'flex-start', gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
   levelButton: {
@@ -95,12 +105,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   levelText: { fontSize: 18, fontWeight: 'bold', color: '#495057' },
-  starRow: {
-    flexDirection: 'row',
-    marginTop: 4,
-    gap: 2
-  },
-  starIcon: {
-    fontSize: 10,
-  }
+  starRow: { flexDirection: 'row', marginTop: 4, gap: 2 },
+  starIcon: { fontSize: 10 }
 });

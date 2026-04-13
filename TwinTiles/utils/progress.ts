@@ -1,63 +1,73 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const PROGRESS_KEY = "GAME_PROGRESS";
+interface GameProgress {
+  [ChapterKey: string]: number
+}
+
+const KEYS = {
+  PROGRESS: "GAME_PROGRESS",
+  levelState: (chapter: number, level: number) => `level_state_${chapter}_${level}`,
+  stars: (chapter: number, level: number) => `stars_${chapter}_${level}`,
+  prefixes: ["chapter_", "level_state_", "stars_", "GAME_PROGRESS"]
+}
+
+const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+const getParsed = async <T>(key: string, defaultValue: T): Promise<T> => {
+  try {
+    const raw = await AsyncStorage.getItem(key)
+    return raw ? JSON.parse(raw) : defaultValue
+  } catch {
+    return defaultValue
+  }
+}
 
 export const unlockNextLevel = async (chapterId: number, completedLevel: number) => {
   try {
-    const rawProgress = await AsyncStorage.getItem(PROGRESS_KEY);
-    let progress = rawProgress ? JSON.parse(rawProgress) : {};
-
+    const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {})
     const chapterKey = `chapter_${chapterId}`;
     const currentUnlocked = progress[chapterKey] || 1;
 
     if (completedLevel >= currentUnlocked) {
       progress[chapterKey] = completedLevel + 1;
-      await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
-      console.log(`Unlocked Level ${completedLevel + 1} for Chapter ${chapterId}`);
+      await AsyncStorage.setItem(KEYS.PROGRESS, JSON.stringify(progress));
     }
   } catch (error) {
-    console.error("Error saving progress:", error);
+    console.error("Error unlocking level:", error);
   }
 };
 
 export const getChapterProgress = async (chapterId: number): Promise<number> => {
-  try {
-    const rawProgress = await AsyncStorage.getItem(PROGRESS_KEY);
-    const progress = rawProgress ? JSON.parse(rawProgress) : {};
-    return progress[`chapter_${chapterId}`] || 1;
-  } catch {
-    return 1;
-  }
+  const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {})
+  return progress[`chapter_${chapterId}`] || 1;
 };
 
 export const saveLevelState = async (chapterId: number, levelId: number, state: number[]) => {
-  const key = `level_state_${chapterId}_${levelId}`;
-  await AsyncStorage.setItem(key, JSON.stringify(state));
+  try {
+    const key = KEYS.levelState(chapterId, levelId)
+    await AsyncStorage.setItem(key, JSON.stringify(state))
+  } catch (e) {
+    console.error("Failed to save level state", e)
+  }
 };
 
 export const getLevelState = async (chapterId: number, levelId: number) => {
-  try {
-    const key = `level_state_${chapterId}_${levelId}`;
-    const saved = await AsyncStorage.getItem(key);
-    return saved ? JSON.parse(saved) : null;
-  } catch (e) {
-    console.warn("AsyncStorage not available:", e);
-    return null;
-  }
+  return await getParsed<number[] | null>(KEYS.levelState(chapterId, levelId), null)
 };
 
 export const resetChapterProgress = async (chapterId: number) => {
   try {
-    const rawProgress = await AsyncStorage.getItem(PROGRESS_KEY);
-    let progress = rawProgress ? JSON.parse(rawProgress) : {};
-    
+    const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {});
     progress[`chapter_${chapterId}`] = 1;
-    await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    await AsyncStorage.setItem(KEYS.PROGRESS, JSON.stringify(progress));
 
     const allKeys = await AsyncStorage.getAllKeys();
 
-    const keysToRemove = allKeys.filter(key => 
-      key.startsWith(`level_state_${chapterId}_`) || 
+    // ✅ Debug: show all keys before filtering
+    console.log("ALL KEYS BEFORE RESET:", allKeys);
+
+    const keysToRemove = allKeys.filter(key =>
+      key.startsWith(`level_state_${chapterId}_`) ||
       key.startsWith(`stars_${chapterId}_`)
     );
 
@@ -65,29 +75,33 @@ export const resetChapterProgress = async (chapterId: number) => {
       await AsyncStorage.multiRemove(keysToRemove);
     }
 
-    console.log(`Chapter ${chapterId} wiped: progress, states, and stars.`);
+    await wait(50);
+
+    console.log(`Chapter ${chapterId} reset successfully. Removed ${keysToRemove.length} keys.`);
   } catch (e) {
-    console.error("Failed to fully reset chapter", e);
+    console.error("Failed to reset chapter", e);
+    throw e;
   }
 };
 
 export const clearAllGameData = async () => {
   try {
-    const keys = await AsyncStorage.getAllKeys();
-    
-    // Identify every key used by the app
-    const gameKeys = keys.filter(key => 
-      key.startsWith('chapter_') ||
-      key.startsWith('level_state_') ||
-      key.startsWith('stars_') ||
-      key === 'GAME_PROGRESS'
+    const allKeys = await AsyncStorage.getAllKeys();
+
+    // ✅ Debug: inspect storage fully
+    console.log("ACTUAL KEYS IN STORAGE:", allKeys);
+
+    const gameKeys = allKeys.filter(key =>
+      KEYS.prefixes.some(prefix => key.startsWith(prefix))
     );
-    
+
     if (gameKeys.length > 0) {
       await AsyncStorage.multiRemove(gameKeys);
     }
-    
-    console.log("Global reset: All game data and stars wiped.");
+
+    await wait(50);
+
+    console.log("Global Reset: All TwinTiles data cleared");
   } catch (e) {
     console.error("Failed to clear all game data", e);
   }
@@ -95,24 +109,26 @@ export const clearAllGameData = async () => {
 
 export const saveLevelStars = async (chapterId: number, level: number, stars: number) => {
   try {
-    const key = `stars_${chapterId}_${level}`;
+    const key = `stars_${chapterId}_${level}`; 
     const existingStars = await AsyncStorage.getItem(key);
-    
-    // Only update if the new score is better than the old one
-    if (!existingStars || stars > parseInt(existingStars)) {
+    const bestStars = existingStars ? parseInt(existingStars, 10) : 0;
+
+    if (stars > bestStars) {
       await AsyncStorage.setItem(key, stars.toString());
     }
-  } catch (e) {
+  } catch(e) {
     console.error("Failed to save stars", e);
   }
 };
 
-export const getLevelStars = async (chapterId: number, level: number) => {
-  try {
-    const key = `stars_${chapterId}_${level}`;
-    const stars = await AsyncStorage.getItem(key);
-    return stars ? parseInt(stars) : 0;
-  } catch (e) {
-    return 0;
-  }
+export const getLevelStars = async (chapterId: number, level: number): Promise<number> => {
+  const key = `stars_${chapterId}_${level}`; 
+  const stars = await AsyncStorage.getItem(key);
+
+  const parsed = stars ? parseInt(stars, 10) : 0;
+
+  // ✅ Debug
+  console.log(`READ STORAGE → ${key}:`, parsed);
+
+  return parsed;
 };

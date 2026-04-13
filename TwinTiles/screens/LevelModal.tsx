@@ -1,44 +1,58 @@
 import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from "react-native";
 import { useIsFocused } from '@react-navigation/native';
 import LevelSelect from '../components/LevelSelect';
 import { chapters } from '../data/chapters';
 import { getLevelStars } from '../utils/progress';
 
 export default function LevelModalScreen({ route, navigation }: any) {
-  const { chapterId } = route.params;
-  const isFocused = useIsFocused();
+  const { chapterId, themeIndex } = route.params;
   const [levelsWithProgress, setLevelsWithProgress] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [internalTick, setInternalTick] = useState(0); // Force re-render trigger
+
+  const loadData = async () => {
+    setLoading(true);
+    const rawLevels = chapters[chapterId]?.levels || [];
+    const enrichedLevels = await Promise.all(
+      rawLevels.map(async (level) => {
+        const starCount = await getLevelStars(chapterId, level.id);
+        return { ...level, stars: starCount }; 
+      })
+    );
+    setLevelsWithProgress([...enrichedLevels]);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const loadLevelData = async () => {
-      const rawLevels = chapters[chapterId]?.levels || [];
+    // This runs when the component mounts
+    loadData();
 
-      const enrichedLevels = await Promise.all(
-        rawLevels.map(async (level) => {
-          const stars = await getLevelStars(chapterId, level.id);
-          return { ...level, stars: stars || 0 };
-        })
-      );
-      
-      setLevelsWithProgress(enrichedLevels);
-    };
+    // This runs EVERY time you navigate to this screen, even if it's already open
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
 
-    if (isFocused) {
-      loadLevelData();
-    }
-  }, [chapterId, isFocused]);
+    return unsubscribe;
+  }, [navigation, chapterId]);
 
   return (
-    <LevelSelect 
-      levels={levelsWithProgress} 
-      onSelectLevel={(level: any) => {
-        navigation.navigate("Game", {
-          levelId: level.id,
-          chapterId: chapterId,
-          size: level.size,
-          levelData: level.grid
-        });
-      }} 
-    />
+    <View style={{ flex: 1 }} key={route.params?.refreshKey || 'static'}>
+      {loading ? (
+        <ActivityIndicator style={{ flex: 1 }} size="large" color="#4dabf7" />
+      ) : (
+        <LevelSelect 
+          key={`list-${chapterId}-${levelsWithProgress[0]?.stars}`} // Force list refresh
+          levels={levelsWithProgress} 
+          onSelectLevel={(level: any) => {
+            navigation.navigate("Game", {
+              levelId: level.id,
+              chapterId: chapterId,
+              themeIndex: themeIndex
+            });
+          }} 
+        />
+      )}
+    </View>
   );
 }
