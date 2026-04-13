@@ -9,18 +9,43 @@ import {
   ActivityIndicator
 } from 'react-native';
 
+// --------------------
+// Types
+// --------------------
+type LevelItem = {
+  id: number;
+  stars?: number;
+};
+
+// --------------------
+// Layout constants
+// --------------------
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const NUM_COLUMNS = 4;
 const SCREEN_PADDING = 20;
 const COLUMN_GAP = 15;
 
-const availableWidth = SCREEN_WIDTH - (SCREEN_PADDING * 2) - (COLUMN_GAP * (NUM_COLUMNS - 1));
+const availableWidth =
+  SCREEN_WIDTH -
+  SCREEN_PADDING * 2 -
+  COLUMN_GAP * (NUM_COLUMNS - 1);
+
 const ITEM_SIZE = Math.floor(availableWidth / NUM_COLUMNS);
 
-const LevelButton = ({ item, onPress }: any) => {
+// --------------------
+// Level Button
+// --------------------
+const LevelButton = ({
+  item,
+  onPress
+}: {
+  item: LevelItem;
+  onPress: (level: LevelItem) => void;
+}) => {
   const displayNum = item.id ?? "?";
-  // Fallback to 0 to ensure yellow stars don't persist
-  const stars = Number(item.stars || 0);
+
+  // ✅ safe + consistent
+  const stars = Number(item.stars ?? 0);
 
   return (
     <TouchableOpacity
@@ -46,7 +71,16 @@ const LevelButton = ({ item, onPress }: any) => {
   );
 };
 
-export default function LevelSelect({ levels, onSelectLevel }: any) {
+// --------------------
+// Main Component
+// --------------------
+export default function LevelSelect({
+  levels,
+  onSelectLevel
+}: {
+  levels: LevelItem[];
+  onSelectLevel: (level: LevelItem) => void;
+}) {
 
   if (levels === undefined) {
     return (
@@ -70,14 +104,17 @@ export default function LevelSelect({ levels, onSelectLevel }: any) {
       <FlatList
         data={levels}
 
-        // ✅ ADD THIS LINE (very important)
-        key={`list-${levels.map(l => l.stars).join("-")}`}
+        // ✅ Forces full refresh when stars change
+        key={`list-${levels.map(l => l.stars ?? 0).join("-")}`}
 
         extraData={levels}
         renderItem={({ item }) => (
           <LevelButton item={item} onPress={onSelectLevel} />
         )}
-        keyExtractor={(item) => `level-${item.id}-${item.stars}`}
+
+        // ✅ stable + safe key
+        keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
+
         numColumns={NUM_COLUMNS}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
@@ -87,12 +124,34 @@ export default function LevelSelect({ levels, onSelectLevel }: any) {
   );
 }
 
+// --------------------
+// Styles
+// --------------------
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { marginTop: 10, color: '#868e96', fontSize: 16 },
-  listContent: { paddingHorizontal: SCREEN_PADDING, paddingTop: 20, paddingBottom: 40 },
-  columnWrapper: { justifyContent: 'flex-start', gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff'
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  emptyText: {
+    marginTop: 10,
+    color: '#868e96',
+    fontSize: 16
+  },
+  listContent: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 20,
+    paddingBottom: 40
+  },
+  columnWrapper: {
+    justifyContent: 'flex-start',
+    gap: COLUMN_GAP,
+    marginBottom: COLUMN_GAP
+  },
   levelButton: {
     backgroundColor: '#f1f3f5',
     borderRadius: 12,
@@ -102,9 +161,19 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 4
   },
-  levelText: { fontSize: 18, fontWeight: 'bold', color: '#495057' },
-  starRow: { flexDirection: 'row', marginTop: 4, gap: 2 },
-  starIcon: { fontSize: 10 }
+  levelText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#495057'
+  },
+  starRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+    gap: 2
+  },
+  starIcon: {
+    fontSize: 10
+  }
 });
