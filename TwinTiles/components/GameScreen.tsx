@@ -43,16 +43,16 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
 
   return (
     <View style={styles.container}>
-      <PuzzleBoard
-        key={`board-${chapterId}-${levelId}`} 
-        levelData={levelData.grid}
-        chapterId={chapterId}
-        level={levelId}
-        size={levelData.size}
-        onNextLevel={handleNextLevel}
-        forcedReset={forcedReset}
-        theme={activeTheme}
-      />
+<PuzzleBoard
+  key={`board-${chapterId}-${levelId}`} 
+  levelData={levelData}
+  chapterId={chapterId}
+  level={levelId}
+  size={levelData.size}
+  onNextLevel={handleNextLevel}
+  forcedReset={forcedReset}
+  theme={activeTheme}
+/>
     </View>
   );
 }
