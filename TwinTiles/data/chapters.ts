@@ -7,11 +7,17 @@ const LINK_COLORS = [
   'rgba(64, 192, 87, 0.25)',
 ];
 
+export interface Cage {
+  indices: number;
+  target: number;
+}
+
 export interface Level {
   id: number;
   size: number;
   grid: number[];
-  links?: { indices: number[], color: string }[]; 
+  links?: { indices: number[], color: string }[];
+  cages?: Cage[];
 }
 
 export interface Chapter {

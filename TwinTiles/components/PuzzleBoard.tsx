@@ -176,8 +176,13 @@ export default function PuzzleBoard({
 
       const saved = await getLevelState(chapterId, level);
       const safeSaved = saved || [];
-      const isFinished = safeSaved.length > 0 && !safeSaved.includes(0);
-      const useSaved = !forcedReset && safeSaved.length === gridData.length && !isFinished;
+      const lengthMatches = safeSaved.length === gridData.length
+
+      const hintsMatch = 
+        lengthMatches &&
+        gridData.every((v, i) => v === 0 || safeSaved[i] === v)
+      const isFinished = lengthMatches && !safeSaved.includes(0)
+      const useSaved = !forcedReset && hintsMatch && !isFinished
 
       setCells(useSaved ? safeSaved : [...gridData]);
       setIsInitializing(false);
