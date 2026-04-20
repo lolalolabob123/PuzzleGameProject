@@ -1,4 +1,4 @@
-import { Dimensions, Platform } from "react-native";
+import { Dimensions } from "react-native";
 
 export function calculateBoardLayout(size: number) {
   const {width: screenWidth, height: screenHeight} = Dimensions.get("window")
@@ -7,7 +7,7 @@ export function calculateBoardLayout(size: number) {
   const UI_SPACING = 160;
 
   const horizontalPadding = 40;
-  const maxAvailableWidth = screenHeight - INDICATOR_WIDTH - horizontalPadding;
+  const maxAvailableWidth = screenWidth - INDICATOR_WIDTH - horizontalPadding;
 
   const maxAvailableHeight = screenHeight - INDICATOR_WIDTH - UI_SPACING;
 

@@ -63,8 +63,6 @@ export const resetChapterProgress = async (chapterId: number) => {
 
     const allKeys = await AsyncStorage.getAllKeys();
 
-    // ✅ Debug: show all keys before filtering
-    console.log("ALL KEYS BEFORE RESET:", allKeys);
 
     const keysToRemove = allKeys.filter(key =>
       key.startsWith(`level_state_${chapterId}_`) ||
@@ -76,8 +74,6 @@ export const resetChapterProgress = async (chapterId: number) => {
     }
 
     await wait(50);
-
-    console.log(`Chapter ${chapterId} reset successfully. Removed ${keysToRemove.length} keys.`);
   } catch (e) {
     console.error("Failed to reset chapter", e);
     throw e;
@@ -87,9 +83,6 @@ export const resetChapterProgress = async (chapterId: number) => {
 export const clearAllGameData = async () => {
   try {
     const allKeys = await AsyncStorage.getAllKeys();
-
-    // ✅ Debug: inspect storage fully
-    console.log("ACTUAL KEYS IN STORAGE:", allKeys);
 
     const gameKeys = allKeys.filter(key =>
       KEYS.prefixes.some(prefix => key.startsWith(prefix))
@@ -101,7 +94,6 @@ export const clearAllGameData = async () => {
 
     await wait(50);
 
-    console.log("Global Reset: All TwinTiles data cleared");
   } catch (e) {
     console.error("Failed to clear all game data", e);
   }
@@ -126,9 +118,6 @@ export const getLevelStars = async (chapterId: number, level: number): Promise<n
   const stars = await AsyncStorage.getItem(key);
 
   const parsed = stars ? parseInt(stars, 10) : 0;
-
-  // ✅ Debug 
-  console.log(`READ STORAGE → ${key}:`, parsed);
 
   return parsed;
 };

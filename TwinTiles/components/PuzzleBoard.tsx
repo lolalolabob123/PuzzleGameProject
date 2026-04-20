@@ -21,10 +21,11 @@ import {
   saveLevelStars
 } from "../utils/progress";
 import { useTheme } from "../context/ThemeContext";
+import { Level } from "../data/chapters";
 
 interface PuzzleBoardProps {
   size: number;
-  levelData: any;
+  levelData: Level;
   chapterId: number;
   level: number;
   onNextLevel: () => void;
@@ -120,9 +121,9 @@ export default function PuzzleBoard({
     const currentVal = cells[index];
     let nextVal = (currentVal + 1) % 3;
 
-    const linkGroup = levelData.links?.find((group: any) => group.indices.includes(index));
+    const linkGroup = levelData.links?.find((group) => group.indices.includes(index));
     if (linkGroup) {
-      linkGroup.indices.forEach((i: number) => { newCells[i] = nextVal; });
+      linkGroup.indices.forEach((i) => { newCells[i] = nextVal; });
     } else {
       newCells[index] = nextVal;
     }
@@ -191,6 +192,19 @@ export default function PuzzleBoard({
       else triggerShake();
     }
   }, [cells, isInitializing, checkWin]);
+  
+  const handleReset = () => {
+    const fresh = [...gridData]
+    hasWonRef.current = false
+    setWinModalVisible(false)
+    setCells(fresh)
+    setHistory([])
+    setMoveCount(0)
+    setHintsLeft(3)
+    setHintIndex(null)
+    starAnims.forEach((a) => a.setValue(0))
+    saveLevelState(chapterId, level, fresh)
+  }
 
   if (isInitializing) return <View style={styles.container}><Text>Loading...</Text></View>;
 
@@ -241,7 +255,7 @@ export default function PuzzleBoard({
                 key={i}
                 val={val}
                 isFixed={gridData[i] !== 0}
-                linkedColor={levelData.links?.find((g: any) => g.indices.includes(i))?.color}
+                linkedColor={levelData.links?.find((g) => g.indices.includes(i))?.color}
                 onPress={() => cycleCell(i)}
                 size={cellSize}
                 isHinted={hintIndex === i}
@@ -253,14 +267,8 @@ export default function PuzzleBoard({
       </View>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => {
-          const fresh = [...gridData];
-          setCells(fresh);
-          setHistory([]);
-          setMoveCount(0);
-          saveLevelState(chapterId, level, fresh);
-        }}>
-          <Text style={styles.buttonText}>Reset</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={handleReset}>
+          <Text style={styles.actionButton}>Reset</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => {
@@ -295,7 +303,17 @@ export default function PuzzleBoard({
   );
 }
 
-const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: any) => {
+type TileProps = {
+  val: number;
+  isFixed: boolean;
+  linkedColor?: string;
+  onPress: () => void;
+  size: number;
+  isHinted: boolean;
+  hintAnim: Animated.Value;
+};
+
+const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: TileProps) => {
   const { theme } = useTheme();
 
   if (val === -1) {
@@ -332,7 +350,14 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: 
   );
 };
 
-const WinModal = ({ visible, stars, moves, onNext }: any) => (
+type WinModalProps = {
+  visible: boolean;
+  stars: Animated.Value[];
+  moves: number;
+  onNext: () => void;
+};
+
+const WinModal = ({ visible, stars, moves, onNext }: WinModalProps) => (
   <Modal visible={visible} transparent animationType="fade">
     <View style={styles.modalOverlay}>
       <View style={styles.modalContent}>

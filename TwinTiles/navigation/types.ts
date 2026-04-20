@@ -1,6 +1,7 @@
 import { NavigatorScreenParams, CompositeScreenProps } from "@react-navigation/native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { NativeStackScreenProps, NativeStackView } from "@react-navigation/native-stack";
+import { BottomTabsScreen } from "react-native-screens";
 
 export type TabParamList = {
   Home: undefined;
@@ -21,6 +22,11 @@ export type RootStackParamList = {
     refreshKey?: string; // Used to force re-mounting
   };
 };
+
+export type HomeScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, "Home">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 export type ChapterSelectProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, "Chapters">,

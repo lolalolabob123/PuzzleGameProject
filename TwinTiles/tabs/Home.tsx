@@ -6,6 +6,8 @@ import { CommonActions } from '@react-navigation/native';
 import { AVAILABLE_THEMES } from "../constants/themes";
 import { useTheme } from "../context/ThemeContext";
 import { resetChapterProgress, clearAllGameData } from "../utils/progress";
+import { HomeScreenProps } from "../navigation/types";
+import { GameTheme } from "../constants/themes";
 
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
@@ -32,7 +34,7 @@ const universalNotify = (title: string, message: string) => {
   Platform.OS === 'web' ? window.alert(message) : Alert.alert(title, message);
 };
 
-export default function HomeScreen({ navigation }: any) {
+export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [infoVisible, setInfoVisible] = useState(false)
@@ -118,7 +120,7 @@ export default function HomeScreen({ navigation }: any) {
   );
 }
 
-const HowToPlay = ({ onClose }: any) => (
+const HowToPlay = ({ onClose }: {onClose: () => void}) => (
   <View style={styles.settingsPage}>
     <View style={styles.settingsHeader}>
       <Text style={styles.settingsTitle}>How to Play</Text>
@@ -140,14 +142,25 @@ const Rule = ({ title, detail }: { title: string, detail: string }) => (
   </View>
 );
 
-const MenuOption = ({ icon, label, onPress, color = "#444" }: any) => (
+type MenuOptionProps = {
+  icon: React.ComponentProps<typeof FontAwesome>["name"];
+  label: string;
+  onPress: () => void;
+  color?: string;
+};
+const MenuOption = ({ icon, label, onPress, color = "#444" }: MenuOptionProps) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
     <FontAwesome name={icon} size={18} color={color} />
     <Text style={[styles.menuText, { color }]}>{label}</Text>
   </TouchableOpacity>
 );
 
-const SettingsContent = ({ currentTheme, onThemeSelect, onClose }: any) => (
+type SettingsContentProps = {
+  currentTheme: GameTheme;
+  onThemeSelect: (index: number) => void;
+  onClose: () => void;
+};
+const SettingsContent = ({ currentTheme, onThemeSelect, onClose }: SettingsContentProps) => (
   <View style={styles.settingsPage}>
     <View style={styles.settingsHeader}>
       <Text style={styles.settingsTitle}>Settings</Text>

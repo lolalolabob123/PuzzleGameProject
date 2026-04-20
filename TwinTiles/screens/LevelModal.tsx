@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from "react-native";
 import LevelSelect from '../components/LevelSelect';
-import { chapters } from '../data/chapters';
+import { LevelModalProps } from '../navigation/types';
+import { chapters, Level } from '../data/chapters';
 import { getLevelStars } from '../utils/progress';
 
-export default function LevelModalScreen({ route, navigation }: any) {
+export default function LevelModalScreen({ route, navigation }: LevelModalProps) {
   const { chapterId, themeIndex } = route.params;
-  const [levelsWithProgress, setLevelsWithProgress] = useState<any[]>([]);
+  const [levelsWithProgress, setLevelsWithProgress] = useState<(Level & {stars: number})[]>([])
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -18,7 +19,6 @@ export default function LevelModalScreen({ route, navigation }: any) {
         return { ...level, stars: starCount };
       })
     );
-    console.log("levelsWithProgress:", JSON.stringify(enrichedLevels.map(l => ({ id: l.id, stars: l.stars }))));
     setLevelsWithProgress([...enrichedLevels]);
     setLoading(false);
   };
@@ -39,7 +39,7 @@ export default function LevelModalScreen({ route, navigation }: any) {
       ) : (
         <LevelSelect
           levels={levelsWithProgress}
-          onSelectLevel={(level: any) => {
+          onSelectLevel={(level) => {
             navigation.navigate("Game", {
               levelId: level.id,
               chapterId: chapterId,

@@ -30,9 +30,7 @@ const LevelButton = ({ item, onPress }: {
   item: LevelItem;
   onPress: (level: LevelItem) => void;
 }) => {
-  console.log(`LevelButton ${item.id} → stars prop:`, item.stars);
   const stars = Number(item.stars ?? 0);
-  console.log(`LevelButton ${item.id} → stars after Number():`, stars);
 
   const displayNum = item.id ?? "?";
 
