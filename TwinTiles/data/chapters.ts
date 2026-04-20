@@ -1,11 +1,11 @@
 // chapters.ts
-import { getFixedLevel } from "../utils/levelGenerator";
+import { getFixedLevel, getFullSolution } from "../utils/levelGenerator";
 
 export interface Level {
   id: number;
   size: number;
   grid: number[];
-  links?: number[][]; // Add this optional property
+  links?: number[][];
 }
 
 export interface Chapter {
@@ -17,17 +17,44 @@ const generateChapterLevels = (chapterId: number, totalLevels: number): Level[] 
   return Array.from({ length: totalLevels }, (_, i) => {
     const levelId = i + 1;
     const size = levelId <= 5 ? 4 : 6;
-    const difficulty = Math.min(0.4 + (i * 0.03), 0.7); 
-    
+    const difficulty = Math.min(0.4 + (i * 0.03), 0.7);
+
     let grid = getFixedLevel(chapterId, levelId, size, difficulty);
+
+    const solution = getFullSolution(chapterId, levelId, size)
+
     let links: number[][] = [];
 
     // CHAPTER 2: Inject Links (e.g., link cells at index 0 and 1)
     if (chapterId === 2) {
-      // Find two empty cells to link
-      const emptyIndices = grid.map((v, idx) => v === 0 ? idx : -1).filter(idx => idx !== -1);
+      const emptyIndices = grid
+        .map((v, index) => v === 0 ? index : -1)
+        .filter(index => index !== -1);
+
       if (emptyIndices.length >= 2) {
-        links.push([emptyIndices[0], emptyIndices[1]]);
+        let first = emptyIndices[0]
+        let second = -1
+
+        for (let j = 1; j < emptyIndices.length; j++) {
+          const indexB = emptyIndices[j]
+
+          if (solution[first] === solution[indexB]) {
+            const rowA = Math.floor(first / size)
+            const colA = first % size
+            const rowB = Math.floor(indexB / size)
+            const colB = indexB % size
+            const dist = Math.abs(rowA - rowB) + Math.abs(colA - colB)
+
+            if (dist > 1) {
+              second = indexB
+              break
+            }
+          }
+        }
+
+        if (second !== -1) {
+          links.push([first, second])
+        }
       }
     }
 
@@ -35,7 +62,7 @@ const generateChapterLevels = (chapterId: number, totalLevels: number): Level[] 
     if (chapterId === 3) {
       const emptyIndices = grid.map((v, idx) => v === 0 ? idx : -1).filter(idx => idx !== -1);
       if (emptyIndices.length > 0) {
-        grid[emptyIndices[0]] = -1; // Set one cell as a void
+        grid[emptyIndices[0]] = -1;
       }
     }
 

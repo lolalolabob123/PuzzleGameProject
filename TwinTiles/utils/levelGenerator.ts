@@ -91,3 +91,13 @@ const countSolutions = (grid: number[], index: number, size: number, limit: numb
   }
   return total;
 };
+
+export const getFullSolution = (chapterId: number, levelId: number, size: number) => {
+  const seed = `chapter-${chapterId}-level-${levelId}`;
+  const rng = seedrandom(seed);
+
+  const fullGrid = new Array(size * size).fill(0);
+  fillGrid(fullGrid, 0, size, rng);
+
+  return fullGrid;
+};
