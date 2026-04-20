@@ -65,11 +65,14 @@ export default function PuzzleBoard({
   const hintPulse = useRef(new Animated.Value(1)).current;
   const starAnims = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
 
+  // Replace your getValidationState inside PuzzleBoard.tsx with this:
+
   const getValidationState = useCallback((arr: number[]) => {
     const voidCount = arr.filter(c => c === -1).length;
     const playableSpace = size - voidCount;
-    
-    // Allow for odd numbers: in 5 spaces, 3 of one color is legal.
+
+    // The floor/ceil logic allows for odd-numbered playable spaces (Chapter 3)
+    const minRequired = Math.floor(playableSpace / 2);
     const maxAllowed = Math.ceil(playableSpace / 2);
 
     const counts = {
@@ -77,7 +80,7 @@ export default function PuzzleBoard({
       two: arr.filter(c => c === 2).length
     };
 
-    // Rule: No more than 2 adjacent of same color
+    // Rule 1: No more than 2 of the same color directly next to each other
     let tripleFound = false;
     for (let i = 0; i < arr.length - 2; i++) {
       if (arr[i] > 0 && arr[i] === arr[i + 1] && arr[i] === arr[i + 2]) {
@@ -86,9 +89,16 @@ export default function PuzzleBoard({
       }
     }
 
-    const overLimit = counts.one > maxAllowed || counts.two > maxAllowed;
-    const isInvalid = tripleFound || overLimit;
-    const isComplete = (counts.one + counts.two) === playableSpace && !isInvalid;
+    // A line is INVALID if it breaks the triple rule or exceeds the max count
+    const isInvalid = tripleFound || counts.one > maxAllowed || counts.two > maxAllowed;
+
+    // A line is COMPLETE only when all spaces are filled and counts are balanced
+    const filledCount = counts.one + counts.two;
+    const isComplete =
+      filledCount === playableSpace &&
+      counts.one >= minRequired && counts.one <= maxAllowed &&
+      counts.two >= minRequired && counts.two <= maxAllowed &&
+      !tripleFound;
 
     return { isInvalid, isComplete, counts };
   }, [size]);
@@ -130,7 +140,7 @@ export default function PuzzleBoard({
 
     const emptyCount = gridData.filter((c: number) => c === 0).length || 1;
     const multiplier = Math.max(1.1, 1.8 - (chapterId - 1) * 0.2);
-    
+
     let stars = 1;
     if (moveCount <= emptyCount * multiplier) stars = 3;
     else if (moveCount <= emptyCount * (multiplier + 0.5)) stars = 2;
@@ -187,7 +197,7 @@ export default function PuzzleBoard({
   return (
     <SafeAreaView style={styles.container}>
       <WinModal visible={winModalVisible} stars={starAnims} moves={moveCount} onNext={onNextLevel} />
-      
+
       <View style={styles.header}>
         <Text style={styles.moveText}>MOVES: {moveCount}</Text>
       </View>
@@ -252,7 +262,7 @@ export default function PuzzleBoard({
         }}>
           <Text style={styles.buttonText}>Reset</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.actionButton} onPress={() => {
           if (history.length > 0) {
             const last = history[history.length - 1];
@@ -263,8 +273,8 @@ export default function PuzzleBoard({
           <Text style={styles.buttonText}>Undo</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: '#fcc419' }]} 
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: '#fcc419' }]}
           onPress={() => {
             if (hintsLeft <= 0) return;
             const target = cells.findIndex(c => c === 0);
@@ -287,7 +297,7 @@ export default function PuzzleBoard({
 
 const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: any) => {
   const { theme } = useTheme();
-  
+
   if (val === -1) {
     return (
       <View style={{ width: size, height: size, padding: 2 }}>
@@ -301,16 +311,16 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: 
   return (
     <TouchableOpacity onPress={onPress} disabled={isFixed} style={{ width: size, height: size, padding: 2 }}>
       <Animated.View style={[{ flex: 1 }, isHinted && { transform: [{ scale: hintAnim }] }]}>
-        <ImageBackground 
-          source={theme.tileBg} 
-          style={styles.fullCell} 
+        <ImageBackground
+          source={theme.tileBg}
+          style={styles.fullCell}
           imageStyle={{ opacity: isFixed ? 0.5 : 1, borderRadius: 6 }}
         >
           {val !== 0 && (
-            <Image 
-              source={val === 1 ? theme.shape1 : theme.shape2} 
-              style={{ width: size * 0.65, height: size * 0.65 }} 
-              resizeMode="contain" 
+            <Image
+              source={val === 1 ? theme.shape1 : theme.shape2}
+              style={{ width: size * 0.65, height: size * 0.65 }}
+              resizeMode="contain"
             />
           )}
           {linkedColor && !isFixed && (

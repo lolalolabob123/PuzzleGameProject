@@ -1,85 +1,87 @@
+// chapters.ts
 import { getFullSolution } from "../utils/levelGenerator";
 
-const LINK_COLORS = ['rgba(34, 139, 230, 0.25)', 'rgba(250, 82, 82, 0.25)', 'rgba(64, 192, 87, 0.25)'];
+const LINK_COLORS = [
+  'rgba(34, 139, 230, 0.25)', // Blue
+  'rgba(250, 82, 82, 0.25)',  // Red
+  'rgba(64, 192, 87, 0.25)',  // Green
+];
 
-const isLineLegal = (line: number[], size: number): boolean => {
-  for (let j = 0; j < line.length - 2; j++) {
-    if (line[j] > 0 && line[j] === line[j+1] && line[j] === line[j+2]) return false;
-  }
+export interface Level {
+  id: number;
+  size: number;
+  grid: number[];
+  links?: { indices: number[], color: string }[]; 
+}
 
-  const voids = line.filter(c => c === -1).length;
-  const playable = size - voids;
-  const max = Math.ceil(playable / 2); 
-  
-  const c1 = line.filter(c => c === 1).length;
-  const c2 = line.filter(c => c === 2).length;
-  
-  if (c1 > max || c2 > max) return false;
-  return true;
-};
-
+/**
+ * Ensures the generated candidate grid follows the basic rules 
+ * (No triples, balanced counts).
+ */
 const isGridLegal = (grid: number[], size: number): boolean => {
   for (let i = 0; i < size; i++) {
     const row = grid.slice(i * size, (i + 1) * size);
     const col = Array.from({ length: size }).map((_, r) => grid[r * size + i]);
-    if (!isLineLegal(row, size) || !isLineLegal(col, size)) return false;
+    
+    // Triple check
+    const hasTriple = (line: number[]) => {
+      for (let j = 0; j < line.length - 2; j++) {
+        if (line[j] > 0 && line[j] === line[j+1] && line[j] === line[j+2]) return true;
+      }
+      return false;
+    };
+
+    if (hasTriple(row) || hasTriple(col)) return false;
+
+    // Count check (Ceiling limit)
+    const max = Math.ceil(size / 2);
+    if (row.filter(c => c === 1).length > max || row.filter(c => c === 2).length > max) return false;
+    if (col.filter(c => c === 1).length > max || col.filter(c => c === 2).length > max) return false;
   }
   return true;
 };
 
-const generateChapterLevels = (chapterId: number): any[] => {
+const generateChapterLevels = (chapterId: number): Level[] => {
   const totalLevels = 10 + (chapterId - 1) * 5;
 
   return Array.from({ length: totalLevels }, (_, i) => {
     const levelId = i + 1;
-    let size = (chapterId === 1 && levelId <= 10) ? 4 : (chapterId >= 4 && levelId > 15 ? 8 : 6);
+    let size = (chapterId === 1 && levelId <= 10) ? 4 : 6;
+    if (chapterId === 4 && levelId > 15) size = 8;
 
-    let finalGrid: number[] = [];
     let solution = getFullSolution(chapterId, levelId, size);
+    let finalGrid: number[] = [];
     let attempts = 0;
 
-    while (attempts < 200) {
+    // We loop to ensure we find a "fair" starting point
+    while (attempts < 100) {
       let candidate = new Array(size * size).fill(0);
-      const density = size === 4 ? 0.4 : 0.28; // Slightly higher density for 6x6/8x8
-      const hintQuota = Math.floor(size * size * density);
-      const revealedIndices = new Set<number>();
+      const revealed = new Set<number>();
+      // Density scales slightly with level
+      const targetHints = Math.floor(size * size * (0.3 + (i * 0.01)));
 
-      // LOGICAL START: Reveal a pair of identical adjacent tiles from the solution
-      for (let j = 0; j < size * size - 1; j++) {
-        if (solution[j] === solution[j+1] && solution[j] > 0 && Math.random() > 0.7) {
-          revealedIndices.add(j);
-          revealedIndices.add(j+1);
-          if (revealedIndices.size >= 4) break;
+      // 1. SEED LOGICAL ANCHORS (Pairs and Gaps)
+      for (let j = 0; j < size * size; j++) {
+        const r = Math.floor(j / size);
+        const c = j % size;
+
+        // Horizontal Pair (XX -> OXXO)
+        if (c < size - 1 && solution[j] === solution[j+1] && Math.random() > 0.6) {
+          revealed.add(j); revealed.add(j+1);
         }
-      }
-
-      // Fill remaining quota randomly
-      while (revealedIndices.size < hintQuota) {
-        revealedIndices.add(Math.floor(Math.random() * (size * size)));
-      }
-
-      revealedIndices.forEach(idx => {
-        candidate[idx] = solution[idx];
-      });
-
-      if (chapterId === 3) {
-        const numVoids = levelId > 10 ? 2 : 1;
-        let voidsPlaced = 0;
-        const availableForVoids = Array.from({ length: size * size }, (_, k) => k)
-          .filter(idx => !revealedIndices.has(idx));
-
-        for (let v = 0; v < numVoids && availableForVoids.length > 0; v++) {
-          const randIdx = Math.floor(Math.random() * availableForVoids.length);
-          const pos = availableForVoids.splice(randIdx, 1)[0];
-          candidate[pos] = -1;
-          if (!isGridLegal(candidate, size)) {
-            candidate[pos] = 0; 
-          } else {
-            voidsPlaced++;
-          }
+        // Vertical Pair
+        if (r < size - 1 && solution[j] === solution[j+size] && Math.random() > 0.6) {
+          revealed.add(j); revealed.add(j+size);
         }
-        if (voidsPlaced < numVoids) { attempts++; continue; }
+        // Gaps (X_X -> XOX)
+        if (c < size - 2 && solution[j] === solution[j+2] && Math.random() > 0.7) {
+          revealed.add(j); revealed.add(j+2);
+        }
+        
+        if (revealed.size >= targetHints) break;
       }
+
+      revealed.forEach(idx => { candidate[idx] = solution[idx]; });
 
       if (isGridLegal(candidate, size)) {
         finalGrid = candidate;
@@ -88,18 +90,33 @@ const generateChapterLevels = (chapterId: number): any[] => {
       attempts++;
     }
 
-    if (finalGrid.length === 0) {
-       finalGrid = solution.map((val, idx) => (idx % 7 === 0 ? val : 0));
+    // Fallback if logic fails
+    if (finalGrid.length === 0) finalGrid = solution.map((v, idx) => idx % 4 === 0 ? v : 0);
+
+    // 2. APPLY VOIDS (Chapter 3)
+    if (chapterId === 3) {
+      const numVoids = levelId > 8 ? 2 : 1;
+      let placed = 0;
+      const empties = finalGrid.map((v, idx) => v === 0 ? idx : -1).filter(idx => idx !== -1);
+      for (let v = 0; v < numVoids && empties.length > 0; v++) {
+        const idx = empties.splice(Math.floor(Math.random() * empties.length), 1)[0];
+        finalGrid[idx] = -1;
+        placed++;
+      }
     }
 
-    let links = [];
+    // 3. APPLY LINKS (Chapter 2)
+    let links: { indices: number[], color: string }[] = [];
     if (chapterId === 2) {
       const empties = finalGrid.map((v, idx) => v === 0 ? idx : -1).filter(idx => idx !== -1);
-      if (empties.length >= 2) {
-        const first = empties[Math.floor(Math.random() * empties.length)];
-        const second = empties.find(idx => idx !== first && solution[idx] === solution[first]);
-        if (second !== undefined) {
-          links.push({ indices: [first, second], color: LINK_COLORS[0] });
+      const numLinks = levelId <= 5 ? 1 : (levelId <= 12 ? 2 : 3);
+      for (let l = 0; l < numLinks; l++) {
+        if (empties.length < 2) break;
+        const first = empties.splice(Math.floor(Math.random() * empties.length), 1)[0];
+        const matchIdx = empties.findIndex(idx => solution[idx] === solution[first]);
+        if (matchIdx !== -1) {
+          const second = empties.splice(matchIdx, 1)[0];
+          links.push({ indices: [first, second], color: LINK_COLORS[l % LINK_COLORS.length] });
         }
       }
     }
@@ -108,7 +125,7 @@ const generateChapterLevels = (chapterId: number): any[] => {
   });
 };
 
-export const chapters: Record<number, any> = {
+export const chapters: Record<number, Chapter> = {
   1: { title: "Chapter 1: The Basics", levels: generateChapterLevels(1) },
   2: { title: "Chapter 2: Multi-Links", levels: generateChapterLevels(2) },
   3: { title: "Chapter 3: The Abyss", levels: generateChapterLevels(3) },
