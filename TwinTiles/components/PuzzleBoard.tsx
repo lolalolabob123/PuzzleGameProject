@@ -21,6 +21,7 @@ import {
   saveLevelStars
 } from "../utils/progress";
 import { GameTheme } from "../constants/themes";
+import { useTheme } from "../context/ThemeContext";
 
 interface PuzzleBoardProps {
   size: number;
@@ -29,7 +30,6 @@ interface PuzzleBoardProps {
   level: number;
   onNextLevel: () => void;
   forcedReset?: boolean;
-  theme: GameTheme;
 }
 
 export default function PuzzleBoard({
@@ -39,12 +39,9 @@ export default function PuzzleBoard({
   level,
   onNextLevel,
   forcedReset = false,
-  theme
 }: PuzzleBoardProps) {
   const INDICATOR_WIDTH = 40;
   const gridData = levelData?.grid || [];
-
-  // 1. LAYOUT
   const { cellSize, boardSize } = useMemo(() => {
     const SCREEN_PADDING = 32;
     const screenWidth = Dimensions.get("window").width;
@@ -54,7 +51,6 @@ export default function PuzzleBoard({
     return { cellSize: final, boardSize: final * size };
   }, [size]);
 
-  // 2. STATE
   const [cells, setCells] = useState<number[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [winModalVisible, setWinModalVisible] = useState(false);
@@ -65,12 +61,12 @@ export default function PuzzleBoard({
 
   const hasWonRef = useRef(false);
 
-  // 3. ANIMATION
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const hintPulse = useRef(new Animated.Value(1)).current;
   const starAnims = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
 
-  // 4. DYNAMIC VALIDATION
+  const { theme } = useTheme()
+
   const getValidationState = useCallback((arr: number[]) => {
     const voidCount = arr.filter(c => c === -1).length;
     const playableSpace = size - voidCount;
@@ -123,20 +119,28 @@ export default function PuzzleBoard({
     return true;
   }, [size, getValidationState]);
 
-  // 5. ACTIONS
   const cycleCell = (index: number) => {
     if (isInitializing || gridData[index] !== 0 || hasWonRef.current) return;
 
     const newCells = [...cells];
-    const nextVal = (cells[index] + 1) % 3;
+    const currentVal = cells[index]
+    let nextVal;
 
-    if (cells[index] === 0) setMoveCount(m => m + 1);
-
-    const link = levelData.links?.find((pair: number[]) => pair.includes(index));
-    if (link) {
-      link.forEach((i: number) => { newCells[i] = nextVal; });
+    if (theme.id === 'ink') {
+      if (currentVal === 0) nextVal = 2
+      else if (currentVal === 2) nextVal = 1
+      else nextVal = 0
     } else {
-      newCells[index] = nextVal;
+      nextVal = (currentVal + 1) % 3
+    }
+
+    if (currentVal === 0) setMoveCount(m => m + 1)
+
+    const link = levelData.links?.find((pair: number[]) => pair.includes(index))
+    if (link) {
+      link.forEach((i: number) => { newCells[i] = nextVal })
+    } else {
+      newCells[index] = nextVal
     }
 
     setHistory(h => [...h, [...cells]].slice(-20));
@@ -150,8 +154,6 @@ export default function PuzzleBoard({
     setCells(freshGrid);
     setHistory([]);
     setMoveCount(0);
-
-    // Pass the fresh grid instead of null to satisfy the number[] requirement
     saveLevelState(chapterId, level, freshGrid);
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -213,31 +215,29 @@ export default function PuzzleBoard({
 
   const gridString = JSON.stringify(levelData?.grid);
 
-  // 6. INIT & WIN CHECK
-useEffect(() => {
-  const init = async () => {
-    setIsInitializing(true);
-    setWinModalVisible(false);
-    setMoveCount(0);
-    setHintsLeft(3);
-    hasWonRef.current = false;
-    starAnims.forEach(a => a.setValue(0));
+  useEffect(() => {
+    const init = async () => {
+      setIsInitializing(true);
+      setWinModalVisible(false);
+      setMoveCount(0);
+      setHintsLeft(3);
+      hasWonRef.current = false;
+      starAnims.forEach(a => a.setValue(0));
 
-    const saved = await getLevelState(chapterId, level);
-    
-    // Ensure 'saved' is treated as an array or empty array to avoid .includes error
-    const safeSaved = saved || [];
-    const isFinished = safeSaved.length > 0 && !safeSaved.includes(0);
-    
-    const useSaved = !forcedReset && 
-                     safeSaved.length === gridData.length && 
-                     !isFinished;
+      const saved = await getLevelState(chapterId, level);
 
-    setCells(useSaved ? safeSaved : [...gridData]);
-    setIsInitializing(false);
-  };
-  init();
-}, [level, chapterId, gridString, forcedReset]);
+      const safeSaved = saved || [];
+      const isFinished = safeSaved.length > 0 && !safeSaved.includes(0);
+
+      const useSaved = !forcedReset &&
+        safeSaved.length === gridData.length &&
+        !isFinished;
+
+      setCells(useSaved ? safeSaved : [...gridData]);
+      setIsInitializing(false);
+    };
+    init();
+  }, [level, chapterId, gridString, forcedReset]);
 
   useEffect(() => {
     if (isInitializing || hasWonRef.current || cells.length === 0) return;
@@ -288,18 +288,21 @@ useEffect(() => {
           </View>
 
           <View style={[styles.board, { width: boardSize, height: boardSize }]}>
-            {cells.map((val, i) => (
-              <Tile
-                key={i}
-                val={val}
-                isFixed={gridData[i] !== 0}
-                onPress={() => cycleCell(i)}
-                size={cellSize}
-                theme={theme}
-                isHinted={hintIndex === i}
-                hintAnim={hintPulse}
-              />
-            ))}
+            {cells.map((val, i) => {
+              const isLinked = levelData.links?.some((pair: number[]) => pair.includes(i))
+              return (
+                <Tile
+                  key={i}
+                  val={val}
+                  isFixed={gridData[i] !== 0}
+                  isLinked={isLinked}
+                  onPress={() => cycleCell(i)}
+                  size={cellSize}
+                  isHinted={hintIndex === i}
+                  hintAnim={hintPulse}
+                />
+              )
+            })}
           </View>
         </Animated.View>
       </View>
@@ -324,9 +327,8 @@ useEffect(() => {
   );
 }
 
-// ... (Tile and WinModal components remain the same as your previous code)
-
-const Tile = ({ val, isFixed, onPress, size, theme, isHinted, hintAnim }: any) => {
+const Tile = ({ val, isFixed, isLinked, onPress, size, isHinted, hintAnim }: any) => {
+  const { theme } = useTheme()
   if (val === -1) {
     return (
       <View style={{ width: size, height: size, padding: 2 }}>
@@ -339,12 +341,21 @@ const Tile = ({ val, isFixed, onPress, size, theme, isHinted, hintAnim }: any) =
 
   return (
     <TouchableOpacity onPress={onPress} disabled={isFixed} style={{ width: size, height: size, padding: 2 }}>
-      <Animated.View style={[{ flex: 1 }, isHinted && { transform: [{ scale: hintAnim }] }]}>
-        <ImageBackground source={theme?.tileBg} style={styles.fullCell} imageStyle={{ opacity: isFixed ? 0.4 : 1, borderRadius: 6 }}>
+      <Animated.View style={[
+        { flex: 1 }, 
+        isHinted && { transform: [{ scale: hintAnim }] }, 
+        isLinked && !isFixed && { borderWidth: 2, borderColor: '#228be6', borderRadius: 8 }
+      ]}>
+        <ImageBackground source={theme.tileBg} style={styles.fullCell} imageStyle={{ opacity: isFixed ? 0.4 : 1, borderRadius: 6 }}>
           {val !== 0 && (
             <Image source={val === 1 ? theme.shape1 : theme.shape2} style={{ width: size * 0.6, height: size * 0.6 }} resizeMode="contain" />
           )}
-          {isHinted && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(252, 196, 25, 0.4)', borderRadius: 6 }]} />}
+          {isLinked && !isFixed && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(34, 139, 230, 0.15)', borderRadius: 6 }]} />
+          )}
+          {isHinted && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(252, 196, 25, 0.5)', borderRadius: 6 }]} />
+          )}
         </ImageBackground>
       </Animated.View>
     </TouchableOpacity>
@@ -389,4 +400,5 @@ const styles = StyleSheet.create({
   statsText: { fontSize: 18, color: "#495057", marginBottom: 30 },
   nextButton: { backgroundColor: "#228be6", paddingVertical: 15, paddingHorizontal: 40, borderRadius: 30 },
   nextButtonText: { color: "white", fontSize: 18, fontWeight: "bold" },
+  linkedIndicator: {position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 3, backgroundColor: '#228be6', borderColor: 'white'}
 });

@@ -8,7 +8,6 @@ import { AVAILABLE_THEMES } from "../constants/themes";
 export default function GameScreen({ route, navigation }: GameScreenProps) {
   const { levelId, chapterId, forcedReset, themeIndex } = route.params;
 
-  // --- 1. DATA LOOKUP ---
   const levelData = useMemo(() => {
     const chapter = chapters[chapterId];
     return chapter?.levels.find((l) => l.id === levelId);
@@ -16,7 +15,6 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
 
   const activeTheme = AVAILABLE_THEMES[themeIndex ?? 0];
 
-  // --- 2. NAVIGATION HANDLERS ---
   const handleNextLevel = () => {
     const currentChapter = chapters[chapterId];
     if (!currentChapter) return;
@@ -36,28 +34,24 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     }
   };
 
-  // --- 3. RENDER LOGIC ---
   if (!levelData) {
     return <ErrorState levelId={levelId} onBack={() => navigation.goBack()} />;
   }
 
   return (
     <View style={styles.container}>
-<PuzzleBoard
-  key={`board-${chapterId}-${levelId}`} 
-  levelData={levelData}
-  chapterId={chapterId}
-  level={levelId}
-  size={levelData.size}
-  onNextLevel={handleNextLevel}
-  forcedReset={forcedReset}
-  theme={activeTheme}
-/>
+      <PuzzleBoard
+        key={`board-${chapterId}-${levelId}`}
+        levelData={levelData}
+        chapterId={chapterId}
+        level={levelId}
+        size={levelData.size}
+        onNextLevel={handleNextLevel}
+        forcedReset={forcedReset}
+      />
     </View>
   );
 }
-
-// --- 4. SUB-COMPONENTS ---
 
 const ErrorState = ({ levelId, onBack }: { levelId: number; onBack: () => void }) => (
   <View style={styles.errorContainer}>
@@ -71,7 +65,6 @@ const ErrorState = ({ levelId, onBack }: { levelId: number; onBack: () => void }
   </View>
 );
 
-// --- STYLES ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,

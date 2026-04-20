@@ -7,7 +7,7 @@ export const AVAILABLE_THEMES = [
     tileBg: require("../assets/Back_tiles/BackTile_16.png"),
   },
   {
-    id: 'ink', // Changed from 'neon' since you don't have Red/Green balls
+    id: 'ink',
     label: 'Ink Set',
     shape1: require("../assets/Balls/Black/ballBlack_06.png"),
     shape2: require("../assets/Balls/Grey/ballGrey_06.png"),
