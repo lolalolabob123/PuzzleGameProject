@@ -106,13 +106,22 @@ export default function PuzzleBoard({
 
   const checkWin = useCallback((board: number[]) => {
     if (!board.length || board.some(c => c === 0)) return false;
+
     for (let i = 0; i < size; i++) {
       const row = board.slice(i * size, (i + 1) * size);
       const col = Array.from({ length: size }).map((_, r) => board[r * size + i]);
       if (!getValidationState(row).isComplete || !getValidationState(col).isComplete) return false;
     }
+
+    if (levelData.cages) {
+      for (const cage of levelData.cages) {
+        const sum = cage.indices.reduce((acc, idx) => acc + (board[idx] > 0 ? board[idx] : 0), 0)
+        if (sum !== cage.target) return false
+      }
+    }
+
     return true;
-  }, [size, getValidationState]);
+  }, [size, getValidationState, levelData.cages]);
 
   const cycleCell = (index: number) => {
     if (isInitializing || gridData[index] !== 0 || hasWonRef.current) return;
@@ -211,6 +220,41 @@ export default function PuzzleBoard({
     saveLevelState(chapterId, level, fresh)
   }
 
+  const cageInfo = useMemo(() => {
+    const byIndex: number[] = new Array(size * size).fill(-1)
+    const targetByIndex: Record<number, number> = {}
+
+    if (levelData.cages) {
+      levelData.cages.forEach((cage, cageIdx) => {
+        cage.indices.forEach(i => {byIndex[i] = cageIdx})
+        const rep = Math.min(...cage.indices)
+        targetByIndex[rep] = cage.target
+      })
+    }
+    return {byIndex, targetByIndex}
+  }, [levelData.cages, size])
+
+  const getCageEdges = useCallback((index: number) => {
+    const myCage = cageInfo.byIndex[index]
+    if (myCage === -1) return null
+
+    const row = Math.floor(index / size)
+    const col = index % size
+
+    const differs = (nRow: number, nCol: number, nIdx: number) => {
+      if (nRow < 0 || nRow >= size || nCol < 0 || nCol >= size) return true
+      return cageInfo.byIndex[nIdx] !== myCage
+    }
+
+    return {
+      top: differs(row -1, col, index - size),
+      bottom: differs(row + 1, col, index + size),
+      left: differs(row, col - 1, index - 1),
+      right: differs(row, col + 1, index + 1),
+      target: cageInfo.targetByIndex[index]
+    }
+  }, [cageInfo, size])
+
   if (isInitializing) return <View style={styles.container}><Text>Loading...</Text></View>;
 
   return (
@@ -265,6 +309,8 @@ export default function PuzzleBoard({
                 size={cellSize}
                 isHinted={hintIndex === i}
                 hintAnim={hintPulse}
+                cageEdges={getCageEdges(i)}
+                chapterId={chapterId}
               />
             ))}
           </View>
@@ -316,9 +362,11 @@ type TileProps = {
   size: number;
   isHinted: boolean;
   hintAnim: Animated.Value;
+  cageEdges: {top: boolean; bottom: boolean; left: boolean; right: boolean; target?: number} | null;
+  chapterId: number;
 };
 
-const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: TileProps) => {
+const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, cageEdges, chapterId }: TileProps) => {
   const { theme } = useTheme();
 
   if (val === -1) {
@@ -346,9 +394,58 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim }: 
               resizeMode="contain"
             />
           )}
+
+          {val !== 0 && chapterId === 4 && (
+            <Text
+            style={{
+              position: 'absolute',
+              fontSize: size * 0.3,
+              fontWeight: '900',
+              color: '#fff',
+              textShadowColor: 'rgba(0,0,0,0.6)',
+              textShadowOffset: {width: 0, height: 1},
+              textShadowRadius: 2,
+            }}
+            >
+              {val}
+            </Text>
+          )}
+
           {linkedColor && !isFixed && (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: linkedColor, borderRadius: 6, borderStyle: 'dashed', borderWidth: 1 }]} />
           )}
+
+          {cageEdges && (
+            <View
+              pointerEvents="none"
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                borderStyle: 'dashed',
+                borderColor: '#495057',
+                borderTopWidth:    cageEdges.top    ? 2 : 0,
+                borderBottomWidth: cageEdges.bottom ? 2 : 0,
+                borderLeftWidth:   cageEdges.left   ? 2 : 0,
+                borderRightWidth:  cageEdges.right  ? 2 : 0,
+
+              }}
+            />
+          )}
+
+          {cageEdges?.target !== undefined && (
+            <Text
+              style={{
+                position: 'absolute',
+                top: 2,
+                left: 4,
+                fontSize: Math.max(10, size * 0.22),
+                fontWeight: '800',
+                color: '#212529,'
+              }}
+              >
+                {cageEdges.target}
+              </Text>
+          )}
+
         </ImageBackground>
       </Animated.View>
     </TouchableOpacity>

@@ -112,8 +112,10 @@ const canCageReachTarget = (
   let sum = 0
   let empties = 0
   for (const i of cage.indices){
-
+    if (grid[i] === 0) empties++
+    else if (grid[i] > 0) sum += grid[i]
   }
+  return sum + empties * 1 <= cage.target && sum + empties * 2 >= cage.target
 }
 
 export const getFullSolution = (chapterId: number, levelId: number, size: number): number[] => {
@@ -136,83 +138,165 @@ export const getSeededVoids = (levelId: number, size: number, count: number): nu
   return positions.slice(0, count);
 };
 
-export const generateCages = (
-  solution: number[],
-  size: number,
-  seed: string
-): Cage[] => {
-  const rng = seedrandom(seed)
-  const n = size * size
-  const cageOf = new Array<number>(n).fill(-1)
+const generateCages = (size: number, rng: any): number[][] => {
+  const total = size * size;
+  const assigned = new Array<number>(total).fill(-1);
+  const groups: number[][] = [];
 
-  const neighbors = (i: number): number[] => {
-    const r = Math.floor(i / size)
-    const c = i % size
-    const adjacent: number[] = []
-    if (r > 0) adjacent.push(i - size)
-    if (r < size - 1) adjacent.push(i + size)
-    if (c > 0) adjacent.push(i - 1)
-    if (c < size - 1) adjacent.push(i + 1)
-    return adjacent.filter((x) => solution[x] !== -1)
-  }
-
-  //Shuffle start order so cages aren't always top-left biased
-  const order = Array.from({ length: n }, (_, i) => i).filter(
-    (i) => solution[i] !== -1
-  )
+  const order = Array.from({ length: total }, (_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]]
+    [order[i], order[j]] = [order[j], order[i]];
   }
 
-  let nextId = 0
-  for (const seedCell of order) {
-    if (cageOf[seedCell] !== -1) continue
-    const cid = nextId++
-    const cage = [seedCell]
-    cageOf[seedCell] = cid
-    const targetSize = 2 + Math.floor(rng() * 3)
+  const neighbors = (idx: number) => {
+    const r = Math.floor(idx / size);
+    const c = idx % size;
+    const out: number[] = [];
+    if (r > 0)        out.push(idx - size);
+    if (r < size - 1) out.push(idx + size);
+    if (c > 0)        out.push(idx - 1);
+    if (c < size - 1) out.push(idx + 1);
+    return out;
+  };
 
-    while (cage.length < targetSize) {
-      const candidates: number[] = []
-      for (const c of cage) {
-        for (const a of neighbors(c)) {
-          if (cageOf[a] === -1 && !candidates.includes(a)) candidates.push(a)
+  for (const seed of order) {
+    if (assigned[seed] !== -1) continue;
+    const targetSize = 2 + Math.floor(rng() * 3); // 2, 3, or 4
+    const group = [seed];
+    assigned[seed] = groups.length;
+
+    while (group.length < targetSize) {
+      const frontier: number[] = [];
+      for (const cell of group) {
+        for (const n of neighbors(cell)) {
+          if (assigned[n] === -1 && !frontier.includes(n)) frontier.push(n);
         }
       }
-      if (candidates.length === 0) break
-      const next = candidates[Math.floor(rng() * candidates.length)]
-      cage.push(next)
-      cageOf[next] = cid
+      if (frontier.length === 0) break;
+      const pick = frontier[Math.floor(rng() * frontier.length)];
+      assigned[pick] = groups.length;
+      group.push(pick);
     }
+
+    groups.push(group);
   }
 
-  //Merge any leftover singletons into an adjacent cage
-  for (let i = 0; i < n; i++) {
-    if (solution[i] === -1) continue
-    const members = cageOf.reduce<number[]>(
-      (acc, c, idx) => (c === cageOf[i] ? (acc.push(idx), acc) : acc),
-      []
-    )
-    if (members.length > 1) continue
-    for (const a of neighbors(i)) {
-      if (cageOf[a] !== cageOf[i]) {
-        cageOf[i] = cageOf[a]
-        break
+  // Merge any singletons into a neighboring group.
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i].length !== 1) continue;
+    const only = groups[i][0];
+    for (const n of neighbors(only)) {
+      const otherId = assigned[n];
+      if (otherId !== i && groups[otherId]) {
+        groups[otherId].push(only);
+        assigned[only] = otherId;
+        groups.splice(i, 1);
+        for (let k = 0; k < assigned.length; k++) {
+          if (assigned[k] > i) assigned[k] -= 1;
+        }
+        break;
       }
     }
   }
 
-  const byId = new Map<number, number[]>()
-  for (let i = 0; i < n; i++){
-    if (solution[i] === -1) continue
-    const id = cageOf[i]
-    if (!byId.has(id)) byId.set(id, [])
-    byId.get(id)!.push(i)
+  return groups;
+};
+
+// Binairo uniqueness check that also respects cage sum constraints.
+// Short-circuits at `limit` solutions (default 2 — we only care about "is it unique").
+const countSolutionsCaged = (
+  grid: number[],
+  size: number,
+  cages: Cage[],
+  limit: number = 2
+): number => {
+  const cageByIndex: number[] = new Array(grid.length).fill(-1);
+  cages.forEach((c, ci) => c.indices.forEach(i => { cageByIndex[i] = ci; }));
+
+  const cageReachable = (ci: number): boolean => {
+    const cage = cages[ci];
+    let sum = 0, empties = 0;
+    for (const idx of cage.indices) {
+      const v = grid[idx];
+      if (v === 0) empties++;
+      else if (v > 0) sum += v;
+    }
+    if (empties === 0) return sum === cage.target;
+    return sum + empties * 1 <= cage.target && sum + empties * 2 >= cage.target;
+  };
+
+  const recurse = (i: number): number => {
+    if (i === grid.length) {
+      for (let ci = 0; ci < cages.length; ci++) {
+        if (!cageReachable(ci)) return 0;
+      }
+      return 1;
+    }
+    if (grid[i] !== 0) return recurse(i + 1);
+
+    let total = 0;
+    for (const color of [1, 2]) {
+      if (isValid(grid, i, color, size)) {
+        grid[i] = color;
+        const ci = cageByIndex[i];
+        if (ci === -1 || cageReachable(ci)) {
+          total += recurse(i + 1);
+          if (total >= limit) { grid[i] = 0; return total; }
+        }
+        grid[i] = 0;
+      }
+    }
+    return total;
+  };
+
+  return recurse(0);
+};
+
+// Build a Chapter 4 level: solved Binairo grid + irregular cages whose
+// targets are derived from the solution. Removes more hints than the
+// other chapters since cages add their own constraint.
+export const getChapter4Level = (
+  levelId: number,
+  size: number,
+  difficulty: number
+): { grid: number[]; cages: Cage[] } => {
+  const seed = `chapter-4-level-${levelId}`;
+  const rng = seedrandom(seed);
+
+  const solution = new Array(size * size).fill(0);
+  if (!fillGrid(solution, 0, size, rng)) {
+    console.error(`Chapter 4 level ${levelId} solution generation failed`);
+    return { grid: new Array(size * size).fill(0), cages: [] };
   }
 
-  return Array.from(byId.values()).map((indices) => ({
-    indices,
-    target: indices.reduce((s, idx) => s + solution[idx], 0)
-  }))
-}
+  const groups = generateCages(size, rng);
+  const cages: Cage[] = groups.map(g => ({
+    indices: g,
+    target: g.reduce((sum, i) => sum + solution[i], 0),
+  }));
+
+  const puzzle = [...solution];
+  const positions = Array.from({ length: size * size }, (_, i) => i);
+  for (let i = positions.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [positions[i], positions[j]] = [positions[j], positions[i]];
+  }
+
+  // +0.15 over the normal difficulty curve — cages pick up the slack.
+  const targetRemove = Math.floor(positions.length * Math.min(0.85, difficulty + 0.15));
+  let removedCount = 0;
+
+  for (const pos of positions) {
+    if (removedCount >= targetRemove) break;
+    const backup = puzzle[pos];
+    puzzle[pos] = 0;
+    if (countSolutionsCaged([...puzzle], size, cages) !== 1) {
+      puzzle[pos] = backup;
+    } else {
+      removedCount++;
+    }
+  }
+
+  return { grid: puzzle, cages };
+};

@@ -1,4 +1,4 @@
-import { getFixedLevel, getFullSolution, getSeededVoids } from "../utils/levelGenerator";
+import { getFixedLevel, getFullSolution, getSeededVoids, getChapter4Level } from "../utils/levelGenerator";
 import seedrandom from "seedrandom";  
 
 const LINK_COLORS = [
@@ -8,7 +8,7 @@ const LINK_COLORS = [
 ];
 
 export interface Cage {
-  indices: number;
+  indices: number[];
   target: number;
 }
 
@@ -38,8 +38,12 @@ const generateChapterLevels = (chapterId: number): Level[] => {
     const perChapter = 0.04
     const difficulty = Math.min(0.65, base + i * perLevel + (chapterId - 1) * perChapter)
 
-    const voids = chapterId === 3 ? getSeededVoids(levelId, size, levelId > 8 ? 2 : 1) : []
+    if (chapterId === 4) {
+      const {grid, cages} = getChapter4Level(levelId, size, difficulty)
+      return {id: levelId, size, grid, cages}
+    }
 
+    const voids = chapterId === 3 ? getSeededVoids(levelId, size, levelId > 8 ? 2 : 1) : []
     const finalGrid = getFixedLevel(chapterId, levelId, size, difficulty, voids)
 
     let links: {indices: number[]; color: string}[] = []
