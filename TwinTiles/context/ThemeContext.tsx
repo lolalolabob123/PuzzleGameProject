@@ -1,24 +1,30 @@
-import React, { createContext, useState, useContext } from 'react';
-import { AVAILABLE_THEMES, GameTheme } from '../constants/themes';
+import React, { createContext, useContext, useState, ReactNode } from "react";
+import { AVAILABLE_THEMES, GameTheme } from "../constants/themes";
+import { uiThemes, UITheme } from "../constants/uiTheme";
 
-const ThemeContext = createContext({
-  theme: AVAILABLE_THEMES[0],
-  themeIndex: 0,
-  setTheme: (index: number) => {},
-});
+type Ctx = {
+  themeIndex: number;
+  setTheme: (i: number) => void;
+  theme: GameTheme;
+  ui: UITheme;
+};
 
-export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
+const ThemeContext = createContext<Ctx | undefined>(undefined);
+
+export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [themeIndex, setThemeIndex] = useState(0);
+  const theme = AVAILABLE_THEMES[themeIndex];
+  const ui = uiThemes[theme.palette];
 
   return (
-    <ThemeContext.Provider value={{ 
-      theme: AVAILABLE_THEMES[themeIndex], 
-      themeIndex, 
-      setTheme: setThemeIndex 
-    }}>
+    <ThemeContext.Provider value={{ themeIndex, setTheme: setThemeIndex, theme, ui }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export const useTheme = () => useContext(ThemeContext);
+export const useTheme = () => {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error("useTheme must be used inside ThemeProvider");
+  return ctx;
+};

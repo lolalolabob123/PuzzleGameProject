@@ -22,6 +22,8 @@ export interface Level {
 
 export interface Chapter {
   title: string;
+  subtitle: string;
+  icon: 'star' | 'link' | 'asterisk' | 'key';
   levels: Level[];
 }
 
@@ -70,8 +72,8 @@ const generateChapterLevels = (chapterId: number): Level[] => {
 }
 
 export const chapters: Record<number, Chapter> = {
-  1: { title: "Chapter 1: The Basics", levels: generateChapterLevels(1) },
-  2: { title: "Chapter 2: Multi-Links", levels: generateChapterLevels(2) },
-  3: { title: "Chapter 3: The Abyss", levels: generateChapterLevels(3) },
-  4: { title: "Chapter 4: The Master", levels: generateChapterLevels(4) }
+  1: {title: "The Basics", subtitle: "Learn the rules", icon: 'star', levels: generateChapterLevels(1)},
+  2: {title: "Multi-Links", subtitle: "Linked tiles move together", icon: 'link', levels: generateChapterLevels(2)},
+  3: {title: "The Void", subtitle: "Voids change the rules", icon: 'asterisk', levels: generateChapterLevels(3)},
+  4: {title: "The Master", subtitle: "Cages add new constraints", icon: 'key', levels: generateChapterLevels(4)}
 };

@@ -42,7 +42,7 @@ export default function PuzzleBoard({
 }: PuzzleBoardProps) {
   const INDICATOR_WIDTH = 45;
   const gridData = levelData?.grid || [];
-  const { theme } = useTheme();
+  const { theme, ui } = useTheme();
 
   const { cellSize, boardSize } = useMemo(() => {
     const SCREEN_PADDING = 32;
@@ -187,7 +187,7 @@ export default function PuzzleBoard({
       const safeSaved = saved || [];
       const lengthMatches = safeSaved.length === gridData.length
 
-      const hintsMatch = 
+      const hintsMatch =
         lengthMatches &&
         gridData.every((v, i) => v === 0 || safeSaved[i] === v)
       const isFinished = lengthMatches && !safeSaved.includes(0)
@@ -206,7 +206,7 @@ export default function PuzzleBoard({
       else triggerShake();
     }
   }, [cells, isInitializing, checkWin]);
-  
+
   const handleReset = () => {
     const fresh = [...gridData]
     hasWonRef.current = false
@@ -223,16 +223,21 @@ export default function PuzzleBoard({
   const cageInfo = useMemo(() => {
     const byIndex: number[] = new Array(size * size).fill(-1)
     const targetByIndex: Record<number, number> = {}
+    const colorByIndex: string[] = new Array(size * size).fill('transparent')
 
     if (levelData.cages) {
       levelData.cages.forEach((cage, cageIdx) => {
-        cage.indices.forEach(i => {byIndex[i] = cageIdx})
-        const rep = Math.min(...cage.indices)
-        targetByIndex[rep] = cage.target
+        const tint = ui.cageTints[cageIdx % ui.cageTints.length]
+        cage.indices.forEach(i => {
+          byIndex[i] = cageIdx
+          colorByIndex[i] = tint
+        })
+        const representativeIndex = Math.min(...cage.indices)
+        targetByIndex[representativeIndex] = cage.target
       })
     }
-    return {byIndex, targetByIndex}
-  }, [levelData.cages, size])
+    return { byIndex, targetByIndex, colorByIndex }
+  }, [levelData.cages, size, ui])
 
   const getCageEdges = useCallback((index: number) => {
     const myCage = cageInfo.byIndex[index]
@@ -247,11 +252,12 @@ export default function PuzzleBoard({
     }
 
     return {
-      top: differs(row -1, col, index - size),
+      top: differs(row - 1, col, index - size),
       bottom: differs(row + 1, col, index + size),
       left: differs(row, col - 1, index - 1),
       right: differs(row, col + 1, index + 1),
-      target: cageInfo.targetByIndex[index]
+      target: cageInfo.targetByIndex[index],
+      tint: cageInfo.colorByIndex[index],
     }
   }, [cageInfo, size])
 
@@ -362,12 +368,19 @@ type TileProps = {
   size: number;
   isHinted: boolean;
   hintAnim: Animated.Value;
-  cageEdges: {top: boolean; bottom: boolean; left: boolean; right: boolean; target?: number} | null;
+  cageEdges: {
+    top: boolean;
+    bottom: boolean;
+    left: boolean;
+    right: boolean;
+    target?: number;
+    tint?: string;
+  } | null;
   chapterId: number;
 };
 
 const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, cageEdges, chapterId }: TileProps) => {
-  const { theme } = useTheme();
+  const { theme, ui } = useTheme();
 
   if (val === -1) {
     return (
@@ -397,38 +410,53 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, ca
 
           {val !== 0 && chapterId === 4 && (
             <Text
-            style={{
-              position: 'absolute',
-              fontSize: size * 0.3,
-              fontWeight: '900',
-              color: '#fff',
-              textShadowColor: 'rgba(0,0,0,0.6)',
-              textShadowOffset: {width: 0, height: 1},
-              textShadowRadius: 2,
-            }}
+              style={{
+                position: 'absolute',
+                fontSize: size * 0.3,
+                fontWeight: '900',
+                color: '#fff',
+                textShadowColor: 'rgba(0,0,0,0.6)',
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 2,
+              }}
             >
               {val}
             </Text>
           )}
 
           {linkedColor && !isFixed && (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: linkedColor, borderRadius: 6, borderStyle: 'dashed', borderWidth: 1 }]} />
+            <View style={[StyleSheet.absoluteFill, {
+              backgroundColor: linkedColor,
+              borderRadius: 6,
+              borderWidth: 1.5,
+              borderColor: linkedColor.replace(/[\d.]+\)$/, '0.6)'),
+            }]} />
           )}
 
           {cageEdges && (
-            <View
-              pointerEvents="none"
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                borderStyle: 'dashed',
-                borderColor: '#495057',
-                borderTopWidth:    cageEdges.top    ? 2 : 0,
-                borderBottomWidth: cageEdges.bottom ? 2 : 0,
-                borderLeftWidth:   cageEdges.left   ? 2 : 0,
-                borderRightWidth:  cageEdges.right  ? 2 : 0,
+            <>
+              {cageEdges.tint && (
+                <View
+                  pointerEvents="none"
+                  style={[
+                    StyleSheet.absoluteFillObject,
+                    { backgroundColor: cageEdges.tint, borderRadius: 4 }
+                  ]}
+                />
+              )}
+              <View
+                pointerEvents="none"
+                style={{
+                  ...StyleSheet.absoluteFillObject,
+                  borderColor: ui.cageBorder,
+                  borderTopWidth: cageEdges.top ? (ui.name === 'mono' ? 3 : 3.25) : 0,
+                  borderBottomWidth: cageEdges.bottom ? (ui.name === 'mono' ? 3 : 3.25) : 0,
+                  borderLeftWidth: cageEdges.left ? (ui.name === 'mono' ? 3 : 3.25) : 0,
+                  borderRightWidth: cageEdges.right ? (ui.name === 'mono' ? 3 : 3.25) : 0,
 
-              }}
-            />
+                }}
+              />
+            </>
           )}
 
           {cageEdges?.target !== undefined && (
@@ -437,13 +465,16 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, ca
                 position: 'absolute',
                 top: 2,
                 left: 4,
-                fontSize: Math.max(10, size * 0.22),
+                fontSize: Math.max(11, size * 0.22),
                 fontWeight: '800',
-                color: '#212529,'
+                color: ui.textPrimary,
+                textShadowColor: 'rgba(255,255,255,0.9)',
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 2,
               }}
-              >
-                {cageEdges.target}
-              </Text>
+            >
+              {cageEdges.target}
+            </Text>
           )}
 
         </ImageBackground>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,50 +6,73 @@ import {
   FlatList,
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radii, typography, shadows, UITheme } from '../constants/uiTheme';
 
 type LevelItem = {
   id: number;
   stars?: number;
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const NUM_COLUMNS = 4;
-const SCREEN_PADDING = 20;
-const COLUMN_GAP = 15;
+type LevelSelectProps = {
+  levels: LevelItem[];
+  onSelectLevel: (level: LevelItem) => void;
+};
 
-const availableWidth =
-  SCREEN_WIDTH -
-  SCREEN_PADDING * 2 -
-  COLUMN_GAP * (NUM_COLUMNS - 1);
-
-const ITEM_SIZE = Math.floor(availableWidth / NUM_COLUMNS);
-
-const LevelButton = ({ item, onPress }: {
+type LevelButtonProps = {
   item: LevelItem;
   onPress: (level: LevelItem) => void;
-}) => {
-  const stars = Number(item.stars ?? 0);
+  itemSize: number;
+};
 
-  const displayNum = item.id ?? "?";
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COLUMNS_PER_ROW = 4;
+const HORIZONTAL_PADDING = spacing.xl;
+const GAP_BETWEEN_COLUMNS = spacing.md;
+
+const availableWidthForTiles =
+  SCREEN_WIDTH -
+  HORIZONTAL_PADDING * 2 -
+  GAP_BETWEEN_COLUMNS * (COLUMNS_PER_ROW - 1);
+
+const DEFAULT_ITEM_SIZE = Math.floor(availableWidthForTiles / COLUMNS_PER_ROW);
+
+const LevelButton = ({ item, onPress, itemSize }: LevelButtonProps) => {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+
+  const starsEarned = Number(item.stars ?? 0);
+  const displayNumber = item.id ?? '?';
+  const isUnplayed = starsEarned === 0;
 
   return (
     <TouchableOpacity
-      style={[styles.levelButton, { width: ITEM_SIZE, height: ITEM_SIZE }]}
+      style={[
+        styles.levelButton,
+        { width: itemSize, height: itemSize },
+        !isUnplayed && styles.levelButtonCompleted,
+      ]}
       onPress={() => onPress(item)}
+      activeOpacity={0.85}
     >
-      <Text style={styles.levelText}>{displayNum}</Text>
+      <Text style={styles.levelNumber}>{displayNumber}</Text>
       <View style={styles.starRow}>
-        {[1, 2, 3].map((s) => (
+        {[1, 2, 3].map((starPosition) => (
           <Text
-            key={s}
+            key={starPosition}
             style={[
               styles.starIcon,
-              { color: s <= stars ? "#fcc419" : "#dee2e6" }
+              {
+                color:
+                  starPosition <= starsEarned
+                    ? uiTheme.star
+                    : uiTheme.surfaceSunken,
+              },
             ]}
           >
-            ★
+            {'\u2605'}
           </Text>
         ))}
       </View>
@@ -57,17 +80,14 @@ const LevelButton = ({ item, onPress }: {
   );
 };
 
-export default function LevelSelect({
-  levels,
-  onSelectLevel
-}: {
-  levels: LevelItem[];
-  onSelectLevel: (level: LevelItem) => void;
-}) {
+export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps) {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+
   if (levels === undefined) {
     return (
       <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" color="#228be6" />
+        <ActivityIndicator size="large" color={uiTheme.primary} />
         <Text style={styles.emptyText}>Loading Levels...</Text>
       </View>
     );
@@ -87,10 +107,14 @@ export default function LevelSelect({
         data={levels}
         extraData={levels}
         renderItem={({ item }) => (
-          <LevelButton item={item} onPress={onSelectLevel} />
+          <LevelButton
+            item={item}
+            onPress={onSelectLevel}
+            itemSize={DEFAULT_ITEM_SIZE}
+          />
         )}
         keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
-        numColumns={NUM_COLUMNS}
+        numColumns={COLUMNS_PER_ROW}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
@@ -99,24 +123,51 @@ export default function LevelSelect({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { marginTop: 10, color: '#868e96', fontSize: 16 },
-  listContent: { paddingHorizontal: SCREEN_PADDING, paddingTop: 20, paddingBottom: 40 },
-  columnWrapper: { justifyContent: 'flex-start', gap: COLUMN_GAP, marginBottom: COLUMN_GAP },
-  levelButton: {
-    backgroundColor: '#f1f3f5',
-    borderRadius: 12,
+const makeStyles = (uiTheme: UITheme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: uiTheme.background },
+  emptyContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4
+    backgroundColor: uiTheme.background,
   },
-  levelText: { fontSize: 18, fontWeight: 'bold', color: '#495057' },
-  starRow: { flexDirection: 'row', marginTop: 4, gap: 2 },
-  starIcon: { fontSize: 10 }
+  emptyText: {
+    ...typography.body,
+    marginTop: spacing.md,
+    color: uiTheme.textMuted,
+  },
+  listContent: {
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  columnWrapper: {
+    justifyContent: 'flex-start',
+    gap: GAP_BETWEEN_COLUMNS,
+    marginBottom: GAP_BETWEEN_COLUMNS,
+  },
+  levelButton: {
+    backgroundColor: uiTheme.surfaceMuted,
+    borderRadius: radii.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  levelButtonCompleted: {
+    backgroundColor: uiTheme.surface,
+    borderWidth: 1,
+    borderColor: uiTheme.border,
+  },
+  levelNumber: {
+    ...typography.title,
+    color: uiTheme.textSecondary,
+  },
+  starRow: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+    gap: 2,
+  },
+  starIcon: {
+    fontSize: 10,
+  },
 });

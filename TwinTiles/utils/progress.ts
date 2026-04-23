@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { chapters } from "../data/chapters";
 
 interface GameProgress {
   [ChapterKey: string]: number
@@ -37,10 +38,25 @@ export const unlockNextLevel = async (chapterId: number, completedLevel: number)
   }
 };
 
-export const getChapterProgress = async (chapterId: number): Promise<number> => {
-  const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {})
-  return progress[`chapter_${chapterId}`] || 1;
+export const getChapterProgress = async (chapterId: number) => {
+  const total = chapters[chapterId]?.levels.length ?? 0;
+  let solved = 0, totalStars = 0;
+  for (const lvl of chapters[chapterId]?.levels ?? []) {
+    const s = await getLevelStars(chapterId, lvl.id);
+    if (s > 0) solved++;
+    totalStars += s;
+  }
+  return { solved, total, totalStars, maxStars: total * 3 };
 };
+
+export const getHighestUnlockedChapter = async (): Promise<number> => {
+  for (let c = 1; c <= 4; c++) {
+    const {solved, total} = await getChapterProgress(c)
+  if (solved < total) return c
+}
+return 4
+}
+
 
 export const saveLevelState = async (chapterId: number, levelId: number, state: number[]) => {
   try {
