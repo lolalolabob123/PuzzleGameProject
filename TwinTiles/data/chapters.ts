@@ -9,7 +9,7 @@ const LINK_COLORS = [
 
 export interface Cage {
   indices: number[];
-  target: number;
+  target?: number;
 }
 
 export interface Level {

@@ -109,9 +109,10 @@ const canCageReachTarget = (
   grid: number[],
   cage: Cage
 ): boolean => {
+  if (cage.target === undefined) return true
   let sum = 0
   let empties = 0
-  for (const i of cage.indices){
+  for (const i of cage.indices) {
     if (grid[i] === 0) empties++
     else if (grid[i] > 0) sum += grid[i]
   }
@@ -153,16 +154,16 @@ const generateCages = (size: number, rng: any): number[][] => {
     const r = Math.floor(idx / size);
     const c = idx % size;
     const out: number[] = [];
-    if (r > 0)        out.push(idx - size);
+    if (r > 0) out.push(idx - size);
     if (r < size - 1) out.push(idx + size);
-    if (c > 0)        out.push(idx - 1);
+    if (c > 0) out.push(idx - 1);
     if (c < size - 1) out.push(idx + 1);
     return out;
   };
 
   for (const seed of order) {
     if (assigned[seed] !== -1) continue;
-    const targetSize = 2 + Math.floor(rng() * 3); // 2, 3, or 4
+    const targetSize = 4 + Math.floor(rng() * 3)
     const group = [seed];
     assigned[seed] = groups.length;
 
@@ -216,6 +217,7 @@ const countSolutionsCaged = (
 
   const cageReachable = (ci: number): boolean => {
     const cage = cages[ci];
+    if (cage.target === undefined) return true
     let sum = 0, empties = 0;
     for (const idx of cage.indices) {
       const v = grid[idx];
@@ -253,9 +255,6 @@ const countSolutionsCaged = (
   return recurse(0);
 };
 
-// Build a Chapter 4 level: solved Binairo grid + irregular cages whose
-// targets are derived from the solution. Removes more hints than the
-// other chapters since cages add their own constraint.
 export const getChapter4Level = (
   levelId: number,
   size: number,
@@ -271,10 +270,15 @@ export const getChapter4Level = (
   }
 
   const groups = generateCages(size, rng);
-  const cages: Cage[] = groups.map(g => ({
-    indices: g,
-    target: g.reduce((sum, i) => sum + solution[i], 0),
-  }));
+  const hideChance = Math.min(0.45, 0.25 + (levelId * 0.01))
+  const cages: Cage[] = groups.map(g => {
+    const sum = g.reduce((acc, i) => acc + solution[i], 0)
+    const hide = rng() < hideChance
+    return {
+      indices: g,
+      target: hide ? undefined : sum,
+    }
+  });
 
   const puzzle = [...solution];
   const positions = Array.from({ length: size * size }, (_, i) => i);
@@ -283,20 +287,121 @@ export const getChapter4Level = (
     [positions[i], positions[j]] = [positions[j], positions[i]];
   }
 
-  // +0.15 over the normal difficulty curve — cages pick up the slack.
-  const targetRemove = Math.floor(positions.length * Math.min(0.85, difficulty + 0.15));
+  const targetRemove = Math.floor(
+    positions.length * Math.min(0.75, difficulty + 0.15)
+  );
   let removedCount = 0;
 
   for (const pos of positions) {
     if (removedCount >= targetRemove) break;
     const backup = puzzle[pos];
     puzzle[pos] = 0;
-    if (countSolutionsCaged([...puzzle], size, cages) !== 1) {
-      puzzle[pos] = backup;
+    if (!isSolvableByDeduction(puzzle, size, cages)) {
+      puzzle[pos] = backup
     } else {
-      removedCount++;
+      removedCount++
+    }
+  }
+  return { grid: puzzle, cages };
+};
+
+const cagePermits = (
+  grid: number[],
+  index: number,
+  color: number,
+  cages: Cage[],
+): boolean => {
+  for (const cage of cages) {
+    if (cage.target === undefined) continue;
+    if (!cage.indices.includes(index)) continue;
+
+    let sum = color;
+    let empties = 0;
+    for (const idx of cage.indices) {
+      if (idx === index) continue;
+      const v = grid[idx];
+      if (v === 0) empties++;
+      else if (v > 0) sum += v;
+    }
+
+    if (empties === 0) {
+      if (sum !== cage.target) return false;
+    } else {
+      if (sum + empties > cage.target) return false; // can't undershoot enough
+      if (sum + empties * 2 < cage.target) return false; // can't overshoot enough
+    }
+  }
+  return true;
+};
+
+const deduceOnce = (
+  grid: number[],
+  size: number,
+  cages: Cage[],
+): number => {
+  let filled = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i] !== 0) continue;
+
+    const canBe1 = isValid(grid, i, 1, size) && cagePermits(grid, i, 1, cages);
+    const canBe2 = isValid(grid, i, 2, size) && cagePermits(grid, i, 2, cages);
+
+    if (!canBe1 && !canBe2) return -1;
+    if (canBe1 && !canBe2) { grid[i] = 1; filled++; }
+    else if (canBe2 && !canBe1) { grid[i] = 2; filled++; }
+  }
+  return filled;
+};
+
+const isSolvableByDeduction = (
+  startingGrid: number[],
+  size: number,
+  cages: Cage[],
+): boolean => {
+  const grid = [...startingGrid];
+  while (grid.some(c => c === 0)) {
+    const progress = deduceOnce(grid, size, cages);
+    if (progress <= 0) return false;
+  }
+  return true;
+};
+
+export const colorCages = (
+  cages: Cage[],
+  size: number,
+  paletteSize: number,
+): number[] => {
+  const cageOf = new Array<number>(size * size).fill(-1)
+  cages.forEach((c, i) => c.indices.forEach(idx => {cageOf[idx] = i}))
+
+  const adj: Set<number>[] = cages.map(() => new Set())
+  for (let idx = 0; idx < cageOf.length; idx++) {
+    const me = cageOf[idx]
+    if (me === -1) continue
+    const row = Math.floor(idx / size), col = idx % size
+    const neighbors = [
+      row > 0 ? idx - size : -1,
+      row < size - 1 ? idx + size : -1,
+      col > 0 ? idx - 1 : -1,
+      col < size - 1 ? idx + 1 : -1,
+    ]
+    for (const n of neighbors) {
+      if (n === -1) continue
+      const other = cageOf[n]
+      if (other !== -1 && other != me) {
+        adj[me].add(other)
+      }
     }
   }
 
-  return { grid: puzzle, cages };
-};
+  const assigned: number[] = new Array(cagePermits.length).fill(-1)
+  for (let i = 0; i < cagePermits.length; i++) {
+    const used = new Set<number>()
+    for (const n  of adj[i]) if (assigned[n] !== -1) used.add(assigned[n])
+      for (let c = 0; c < paletteSize; c++) {
+    if (!used.has(c)) {assigned[i] = c; break}
+    }
+    if (assigned[i] === -1) assigned[i] = i  % paletteSize
+  }
+  return assigned
+}

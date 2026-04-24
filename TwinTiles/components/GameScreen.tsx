@@ -3,17 +3,25 @@ import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { GameScreenProps } from "../navigation/types";
 import PuzzleBoard from "../components/PuzzleBoard";
 import { chapters } from "../data/chapters";
-import { AVAILABLE_THEMES } from "../constants/themes";
+import { useTheme } from '../context/ThemeContext';
+import {
+  spacing,
+  radii,
+  typography,
+  shadows,
+  UITheme,
+} from "../constants/uiTheme";
 
 export default function GameScreen({ route, navigation }: GameScreenProps) {
   const { levelId, chapterId, forcedReset, themeIndex } = route.params;
+
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const levelData = useMemo(() => {
     const chapter = chapters[chapterId];
     return chapter?.levels.find((l) => l.id === levelId);
   }, [chapterId, levelId]);
-
-  const activeTheme = AVAILABLE_THEMES[themeIndex ?? 0];
 
   const handleNextLevel = () => {
     const currentChapter = chapters[chapterId];
@@ -27,7 +35,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
         levelId: nextLevel.id,
         chapterId,
         forcedReset: false,
-        themeIndex: themeIndex ?? 0
+        themeIndex: themeIndex ?? 0,
       });
     } else {
       navigation.goBack();
@@ -53,49 +61,63 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   );
 }
 
-const ErrorState = ({ levelId, onBack }: { levelId: number; onBack: () => void }) => (
-  <View style={styles.errorContainer}>
-    <Text style={styles.errorText}>Level {levelId} not found!</Text>
-    <Text style={styles.errorSubtext}>
-      This level might not be added to your chapters data yet.
-    </Text>
-    <TouchableOpacity style={styles.backButton} onPress={onBack}>
-      <Text style={styles.backButtonText}>Go Back</Text>
-    </TouchableOpacity>
-  </View>
-);
+const ErrorState = ({
+  levelId,
+  onBack,
+}: {
+  levelId: number;
+  onBack: () => void;
+}) => {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fa5252',
-  },
-  errorSubtext: {
-    fontSize: 16,
-    color: '#868e96',
-    textAlign: 'center',
-    marginVertical: 10,
-  },
-  backButton: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#4dabf7',
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  }
-});
+  return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorText}>Level {levelId} not found!</Text>
+      <Text style={styles.errorSubtext}>
+        This level might not be added to your chapters data yet.
+      </Text>
+      <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <Text style={styles.backButtonText}>Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const makeStyles = (uiTheme: UITheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: uiTheme.background,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xl,
+      backgroundColor: uiTheme.background,
+    },
+    errorText: {
+      ...typography.title,
+      fontSize: 22,
+      color: uiTheme.danger,
+    },
+    errorSubtext: {
+      ...typography.body,
+      color: uiTheme.textMuted,
+      textAlign: 'center',
+      marginVertical: spacing.sm + 2,
+    },
+    backButton: {
+      marginTop: spacing.xl,
+      paddingHorizontal: spacing.xxl - 8,
+      paddingVertical: spacing.md,
+      backgroundColor: uiTheme.primary,
+      borderRadius: radii.md,
+      ...shadows.sm,
+    },
+    backButtonText: {
+      color: uiTheme.name === 'mono' ? uiTheme.surface : '#FFFFFF',
+      fontWeight: 'bold',
+    },
+  });

@@ -8,7 +8,7 @@ import {
   Image,
   ImageBackground,
   Animated,
-  Dimensions
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -18,10 +18,18 @@ import {
   unlockNextLevel,
   saveLevelState,
   getLevelState,
-  saveLevelStars
+  saveLevelStars,
 } from "../utils/progress";
 import { useTheme } from "../context/ThemeContext";
 import { Level } from "../data/chapters";
+import { colorCages } from "../utils/levelGenerator";
+import {
+  spacing,
+  radii,
+  typography,
+  shadows,
+  UITheme,
+} from "../constants/uiTheme";
 
 interface PuzzleBoardProps {
   size: number;
@@ -42,15 +50,19 @@ export default function PuzzleBoard({
 }: PuzzleBoardProps) {
   const INDICATOR_WIDTH = 45;
   const gridData = levelData?.grid || [];
-  const { theme, ui } = useTheme();
+  const { theme, ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const { cellSize, boardSize } = useMemo(() => {
     const SCREEN_PADDING = 32;
     const screenWidth = Dimensions.get("window").width;
     const maxWidth = screenWidth - INDICATOR_WIDTH - SCREEN_PADDING;
     const { cellSize: raw } = calculateBoardLayout(size);
-    const final = Math.max(30, Math.min(Math.floor(raw), Math.floor(maxWidth / size)));
-    return { cellSize: final, boardSize: final * size };
+    const finalCellSize = Math.max(
+      30,
+      Math.min(Math.floor(raw), Math.floor(maxWidth / size))
+    );
+    return { cellSize: finalCellSize, boardSize: finalCellSize * size };
   }, [size]);
 
   const [cells, setCells] = useState<number[]>([]);
@@ -64,81 +76,102 @@ export default function PuzzleBoard({
   const hasWonRef = useRef(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const hintPulse = useRef(new Animated.Value(1)).current;
-  const starAnims = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const starAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
 
-  // Replace your getValidationState inside PuzzleBoard.tsx with this:
+  const getValidationState = useCallback(
+    (arr: number[]) => {
+      const voidCount = arr.filter((c) => c === -1).length;
+      const playableSpace = size - voidCount;
 
-  const getValidationState = useCallback((arr: number[]) => {
-    const voidCount = arr.filter(c => c === -1).length;
-    const playableSpace = size - voidCount;
+      const minRequired = Math.floor(playableSpace / 2);
+      const maxAllowed = Math.ceil(playableSpace / 2);
 
-    // The floor/ceil logic allows for odd-numbered playable spaces (Chapter 3)
-    const minRequired = Math.floor(playableSpace / 2);
-    const maxAllowed = Math.ceil(playableSpace / 2);
+      const counts = {
+        one: arr.filter((c) => c === 1).length,
+        two: arr.filter((c) => c === 2).length,
+      };
 
-    const counts = {
-      one: arr.filter(c => c === 1).length,
-      two: arr.filter(c => c === 2).length
-    };
-
-    // Rule 1: No more than 2 of the same color directly next to each other
-    let tripleFound = false;
-    for (let i = 0; i < arr.length - 2; i++) {
-      if (arr[i] > 0 && arr[i] === arr[i + 1] && arr[i] === arr[i + 2]) {
-        tripleFound = true;
-        break;
+      let tripleFound = false;
+      for (let i = 0; i < arr.length - 2; i++) {
+        if (arr[i] > 0 && arr[i] === arr[i + 1] && arr[i] === arr[i + 2]) {
+          tripleFound = true;
+          break;
+        }
       }
-    }
 
-    // A line is INVALID if it breaks the triple rule or exceeds the max count
-    const isInvalid = tripleFound || counts.one > maxAllowed || counts.two > maxAllowed;
+      const isInvalid =
+        tripleFound || counts.one > maxAllowed || counts.two > maxAllowed;
 
-    // A line is COMPLETE only when all spaces are filled and counts are balanced
-    const filledCount = counts.one + counts.two;
-    const isComplete =
-      filledCount === playableSpace &&
-      counts.one >= minRequired && counts.one <= maxAllowed &&
-      counts.two >= minRequired && counts.two <= maxAllowed &&
-      !tripleFound;
+      const filledCount = counts.one + counts.two;
+      const isComplete =
+        filledCount === playableSpace &&
+        counts.one >= minRequired &&
+        counts.one <= maxAllowed &&
+        counts.two >= minRequired &&
+        counts.two <= maxAllowed &&
+        !tripleFound;
 
-    return { isInvalid, isComplete, counts };
-  }, [size]);
+      return { isInvalid, isComplete, counts };
+    },
+    [size]
+  );
 
-  const checkWin = useCallback((board: number[]) => {
-    if (!board.length || board.some(c => c === 0)) return false;
+  const checkWin = useCallback(
+    (board: number[]) => {
+      if (!board.length || board.some((c) => c === 0)) return false;
 
-    for (let i = 0; i < size; i++) {
-      const row = board.slice(i * size, (i + 1) * size);
-      const col = Array.from({ length: size }).map((_, r) => board[r * size + i]);
-      if (!getValidationState(row).isComplete || !getValidationState(col).isComplete) return false;
-    }
-
-    if (levelData.cages) {
-      for (const cage of levelData.cages) {
-        const sum = cage.indices.reduce((acc, idx) => acc + (board[idx] > 0 ? board[idx] : 0), 0)
-        if (sum !== cage.target) return false
+      for (let i = 0; i < size; i++) {
+        const row = board.slice(i * size, (i + 1) * size);
+        const col = Array.from({ length: size }).map(
+          (_, r) => board[r * size + i]
+        );
+        if (
+          !getValidationState(row).isComplete ||
+          !getValidationState(col).isComplete
+        )
+          return false;
       }
-    }
 
-    return true;
-  }, [size, getValidationState, levelData.cages]);
+      if (levelData.cages) {
+        for (const cage of levelData.cages) {
+          if (cage.target === undefined) continue;
+          const sum = cage.indices.reduce(
+            (acc, idx) => acc + (board[idx] > 0 ? board[idx] : 0),
+            0
+          );
+          if (sum !== cage.target) return false;
+        }
+      }
+
+      return true;
+    },
+    [size, getValidationState, levelData.cages]
+  );
 
   const cycleCell = (index: number) => {
     if (isInitializing || gridData[index] !== 0 || hasWonRef.current) return;
 
     const newCells = [...cells];
     const currentVal = cells[index];
-    let nextVal = (currentVal + 1) % 3;
+    const nextVal = (currentVal + 1) % 3;
 
-    const linkGroup = levelData.links?.find((group) => group.indices.includes(index));
+    const linkGroup = levelData.links?.find((group) =>
+      group.indices.includes(index)
+    );
     if (linkGroup) {
-      linkGroup.indices.forEach((i) => { newCells[i] = nextVal; });
+      linkGroup.indices.forEach((i) => {
+        newCells[i] = nextVal;
+      });
     } else {
       newCells[index] = nextVal;
     }
 
-    if (currentVal === 0) setMoveCount(m => m + 1);
-    setHistory(h => [...h, [...cells]].slice(-20));
+    if (currentVal === 0) setMoveCount((m) => m + 1);
+    setHistory((h) => [...h, [...cells]].slice(-20));
     setCells(newCells);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     saveLevelState(chapterId, level, newCells);
@@ -149,7 +182,8 @@ export default function PuzzleBoard({
     hasWonRef.current = true;
 
     const emptyCount = gridData.filter((c: number) => c === 0).length || 1;
-    const multiplier = Math.max(1.1, 1.8 - (chapterId - 1) * 0.2);
+    const multiplier =
+      chapterId === 4 ? 1.15 : Math.max(1.1, 1.8 - (chapterId - 1) * 0.2);
 
     let stars = 1;
     if (moveCount <= emptyCount * multiplier) stars = 3;
@@ -161,16 +195,34 @@ export default function PuzzleBoard({
     setWinModalVisible(true);
 
     starAnims.slice(0, stars).forEach((a, i) => {
-      Animated.spring(a, { toValue: 1, friction: 5, tension: 40, delay: i * 200, useNativeDriver: true }).start();
+      Animated.spring(a, {
+        toValue: 1,
+        friction: 5,
+        tension: 40,
+        delay: i * 200,
+        useNativeDriver: true,
+      }).start();
     });
   };
 
   const triggerShake = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 50,
+        useNativeDriver: true,
+      }),
     ]).start();
   };
 
@@ -181,17 +233,17 @@ export default function PuzzleBoard({
       setMoveCount(0);
       setHintsLeft(3);
       hasWonRef.current = false;
-      starAnims.forEach(a => a.setValue(0));
+      starAnims.forEach((a) => a.setValue(0));
 
       const saved = await getLevelState(chapterId, level);
       const safeSaved = saved || [];
-      const lengthMatches = safeSaved.length === gridData.length
+      const lengthMatches = safeSaved.length === gridData.length;
 
       const hintsMatch =
         lengthMatches &&
-        gridData.every((v, i) => v === 0 || safeSaved[i] === v)
-      const isFinished = lengthMatches && !safeSaved.includes(0)
-      const useSaved = !forcedReset && hintsMatch && !isFinished
+        gridData.every((v, i) => v === 0 || safeSaved[i] === v);
+      const isFinished = lengthMatches && !safeSaved.includes(0);
+      const useSaved = !forcedReset && hintsMatch && !isFinished;
 
       setCells(useSaved ? safeSaved : [...gridData]);
       setIsInitializing(false);
@@ -201,71 +253,93 @@ export default function PuzzleBoard({
 
   useEffect(() => {
     if (isInitializing || hasWonRef.current || cells.length === 0) return;
-    if (cells.every(c => c !== 0)) {
+    if (cells.every((c) => c !== 0)) {
       if (checkWin(cells)) handleWin();
       else triggerShake();
     }
   }, [cells, isInitializing, checkWin]);
 
   const handleReset = () => {
-    const fresh = [...gridData]
-    hasWonRef.current = false
-    setWinModalVisible(false)
-    setCells(fresh)
-    setHistory([])
-    setMoveCount(0)
-    setHintsLeft(3)
-    setHintIndex(null)
-    starAnims.forEach((a) => a.setValue(0))
-    saveLevelState(chapterId, level, fresh)
-  }
+    const fresh = [...gridData];
+    hasWonRef.current = false;
+    setWinModalVisible(false);
+    setCells(fresh);
+    setHistory([]);
+    setMoveCount(0);
+    setHintsLeft(3);
+    setHintIndex(null);
+    starAnims.forEach((a) => a.setValue(0));
+    saveLevelState(chapterId, level, fresh);
+  };
 
   const cageInfo = useMemo(() => {
-    const byIndex: number[] = new Array(size * size).fill(-1)
-    const targetByIndex: Record<number, number> = {}
-    const colorByIndex: string[] = new Array(size * size).fill('transparent')
+    const byIndex: number[] = new Array(size * size).fill(-1);
+    const targetByIndex: Record<number, number> = {};
+    const colorByIndex: string[] = new Array(size * size).fill("transparent");
 
     if (levelData.cages) {
+      const tintAssignments = colorCages(
+        levelData.cages,
+        size,
+        uiTheme.cageTints.length
+      );
+
       levelData.cages.forEach((cage, cageIdx) => {
-        const tint = ui.cageTints[cageIdx % ui.cageTints.length]
-        cage.indices.forEach(i => {
-          byIndex[i] = cageIdx
-          colorByIndex[i] = tint
-        })
-        const representativeIndex = Math.min(...cage.indices)
-        targetByIndex[representativeIndex] = cage.target
-      })
+        const tint = uiTheme.cageTints[tintAssignments[cageIdx]];
+        cage.indices.forEach((i) => {
+          byIndex[i] = cageIdx;
+          colorByIndex[i] = tint;
+        });
+        if (cage.target !== undefined) {
+          const representativeIndex = Math.min(...cage.indices);
+          targetByIndex[representativeIndex] = cage.target;
+        }
+      });
     }
-    return { byIndex, targetByIndex, colorByIndex }
-  }, [levelData.cages, size, ui])
+    return { byIndex, targetByIndex, colorByIndex };
+  }, [levelData.cages, size, uiTheme]);
 
-  const getCageEdges = useCallback((index: number) => {
-    const myCage = cageInfo.byIndex[index]
-    if (myCage === -1) return null
+  const getCageEdges = useCallback(
+    (index: number) => {
+      const myCage = cageInfo.byIndex[index];
+      if (myCage === -1) return null;
 
-    const row = Math.floor(index / size)
-    const col = index % size
+      const row = Math.floor(index / size);
+      const col = index % size;
 
-    const differs = (nRow: number, nCol: number, nIdx: number) => {
-      if (nRow < 0 || nRow >= size || nCol < 0 || nCol >= size) return true
-      return cageInfo.byIndex[nIdx] !== myCage
-    }
+      const differs = (nRow: number, nCol: number, nIdx: number) => {
+        if (nRow < 0 || nRow >= size || nCol < 0 || nCol >= size) return true;
+        return cageInfo.byIndex[nIdx] !== myCage;
+      };
 
-    return {
-      top: differs(row - 1, col, index - size),
-      bottom: differs(row + 1, col, index + size),
-      left: differs(row, col - 1, index - 1),
-      right: differs(row, col + 1, index + 1),
-      target: cageInfo.targetByIndex[index],
-      tint: cageInfo.colorByIndex[index],
-    }
-  }, [cageInfo, size])
+      return {
+        top: differs(row - 1, col, index - size),
+        bottom: differs(row + 1, col, index + size),
+        left: differs(row, col - 1, index - 1),
+        right: differs(row, col + 1, index + 1),
+        target: cageInfo.targetByIndex[index],
+        tint: cageInfo.colorByIndex[index],
+      };
+    },
+    [cageInfo, size]
+  );
 
-  if (isInitializing) return <View style={styles.container}><Text>Loading...</Text></View>;
+  if (isInitializing) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <WinModal visible={winModalVisible} stars={starAnims} moves={moveCount} onNext={onNextLevel} />
+      <WinModal
+        visible={winModalVisible}
+        stars={starAnims}
+        moves={moveCount}
+        onNext={onNextLevel}
+      />
 
       <View style={styles.header}>
         <Text style={styles.moveText}>MOVES: {moveCount}</Text>
@@ -274,14 +348,28 @@ export default function PuzzleBoard({
       <View style={styles.gameWrapper}>
         <View style={{ flexDirection: "row" }}>
           <View style={{ width: INDICATOR_WIDTH }} />
-          <View style={{ flexDirection: 'row', width: boardSize }}>
+          <View style={{ flexDirection: "row", width: boardSize }}>
             {Array.from({ length: size }).map((_, colIdx) => {
-              const col = Array.from({ length: size }).map((_, r) => cells[r * size + colIdx]);
-              const { isInvalid, isComplete, counts } = getValidationState(col);
+              const col = Array.from({ length: size }).map(
+                (_, r) => cells[r * size + colIdx]
+              );
+              const { isInvalid, isComplete, counts } =
+                getValidationState(col);
               return (
-                <View key={colIdx} style={{ width: cellSize, alignItems: "center" }}>
-                  <Text style={[styles.indicatorText, isInvalid && styles.textRed, isComplete && styles.textGreen]}>
-                    {counts.one}{"\n"}{counts.two}
+                <View
+                  key={colIdx}
+                  style={{ width: cellSize, alignItems: "center" }}
+                >
+                  <Text
+                    style={[
+                      styles.indicatorText,
+                      isInvalid && styles.textRed,
+                      isComplete && styles.textGreen,
+                    ]}
+                  >
+                    {counts.one}
+                    {"\n"}
+                    {counts.two}
                   </Text>
                 </View>
               );
@@ -289,14 +377,29 @@ export default function PuzzleBoard({
           </View>
         </View>
 
-        <Animated.View style={[styles.boardRow, { transform: [{ translateX: shakeAnim }] }]}>
-          <View style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}>
+        <Animated.View
+          style={[styles.boardRow, { transform: [{ translateX: shakeAnim }] }]}
+        >
+          <View
+            style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}
+          >
             {Array.from({ length: size }).map((_, rowIdx) => {
               const row = cells.slice(rowIdx * size, (rowIdx + 1) * size);
-              const { isInvalid, isComplete, counts } = getValidationState(row);
+              const { isInvalid, isComplete, counts } =
+                getValidationState(row);
               return (
-                <View key={rowIdx} style={{ height: cellSize, justifyContent: "center" }}>
-                  <Text style={[styles.indicatorText, { textAlign: 'right', paddingRight: 8 }, isInvalid && styles.textRed, isComplete && styles.textGreen]}>
+                <View
+                  key={rowIdx}
+                  style={{ height: cellSize, justifyContent: "center" }}
+                >
+                  <Text
+                    style={[
+                      styles.indicatorText,
+                      { textAlign: "right", paddingRight: 8 },
+                      isInvalid && styles.textRed,
+                      isComplete && styles.textGreen,
+                    ]}
+                  >
                     {counts.one}|{counts.two}
                   </Text>
                 </View>
@@ -310,7 +413,9 @@ export default function PuzzleBoard({
                 key={i}
                 val={val}
                 isFixed={gridData[i] !== 0}
-                linkedColor={levelData.links?.find((g) => g.indices.includes(i))?.color}
+                linkedColor={
+                  levelData.links?.find((g) => g.indices.includes(i))?.color
+                }
                 onPress={() => cycleCell(i)}
                 size={cellSize}
                 isHinted={hintIndex === i}
@@ -325,35 +430,46 @@ export default function PuzzleBoard({
 
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.actionButton} onPress={handleReset}>
-          <Text style={styles.actionButton}>Reset</Text>
+          <Text style={styles.buttonText}>Reset</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={() => {
-          if (history.length > 0) {
-            const last = history[history.length - 1];
-            setCells(last);
-            setHistory(h => h.slice(0, -1));
-          }
-        }}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => {
+            if (history.length > 0) {
+              const last = history[history.length - 1];
+              setCells(last);
+              setHistory((h) => h.slice(0, -1));
+            }
+          }}
+        >
           <Text style={styles.buttonText}>Undo</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: '#fcc419' }]}
+          style={[styles.actionButton, styles.hintButton]}
           onPress={() => {
             if (hintsLeft <= 0) return;
-            const target = cells.findIndex(c => c === 0);
+            const target = cells.findIndex((c) => c === 0);
             if (target !== -1) {
               setHintIndex(target);
-              setHintsLeft(h => h - 1);
+              setHintsLeft((h) => h - 1);
               Animated.sequence([
-                Animated.timing(hintPulse, { toValue: 1.3, duration: 300, useNativeDriver: true }),
-                Animated.timing(hintPulse, { toValue: 1.0, duration: 300, useNativeDriver: true }),
+                Animated.timing(hintPulse, {
+                  toValue: 1.3,
+                  duration: 300,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(hintPulse, {
+                  toValue: 1.0,
+                  duration: 300,
+                  useNativeDriver: true,
+                }),
               ]).start(() => setHintIndex(null));
             }
           }}
         >
-          <Text style={styles.buttonText}>Hint ({hintsLeft})</Text>
+          <Text style={styles.hintButtonText}>Hint ({hintsLeft})</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -379,26 +495,54 @@ type TileProps = {
   chapterId: number;
 };
 
-const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, cageEdges, chapterId }: TileProps) => {
-  const { theme, ui } = useTheme();
+const Tile = ({
+  val,
+  isFixed,
+  linkedColor,
+  onPress,
+  size,
+  isHinted,
+  hintAnim,
+  cageEdges,
+  chapterId,
+}: TileProps) => {
+  const { theme, ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   if (val === -1) {
     return (
       <View style={{ width: size, height: size, padding: 2 }}>
-        <View style={[styles.fullCell, { backgroundColor: '#343a40', borderRadius: 6, opacity: 0.5 }]}>
-          <Text style={{ color: '#fff', fontSize: size * 0.4 }}>×</Text>
+        <View
+          style={[
+            styles.fullCell,
+            styles.voidCell,
+            { borderRadius: radii.sm },
+          ]}
+        >
+          <Text style={[styles.voidCellMark, { fontSize: size * 0.4 }]}>×</Text>
         </View>
       </View>
     );
   }
 
+  const cageBorderThickness = uiTheme.name === "mono" ? 4 : 3.5;
+
   return (
-    <TouchableOpacity onPress={onPress} disabled={isFixed} style={{ width: size, height: size, padding: 2 }}>
-      <Animated.View style={[{ flex: 1 }, isHinted && { transform: [{ scale: hintAnim }] }]}>
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={isFixed}
+      style={{ width: size, height: size, padding: 2 }}
+    >
+      <Animated.View
+        style={[{ flex: 1 }, isHinted && { transform: [{ scale: hintAnim }] }]}
+      >
         <ImageBackground
           source={theme.tileBg}
           style={styles.fullCell}
-          imageStyle={{ opacity: isFixed ? 0.5 : 1, borderRadius: 6 }}
+          imageStyle={{
+            opacity: isFixed ? 0.5 : 1,
+            borderRadius: radii.sm,
+          }}
         >
           {val !== 0 && (
             <Image
@@ -410,27 +554,27 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, ca
 
           {val !== 0 && chapterId === 4 && (
             <Text
-              style={{
-                position: 'absolute',
-                fontSize: size * 0.3,
-                fontWeight: '900',
-                color: '#fff',
-                textShadowColor: 'rgba(0,0,0,0.6)',
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 2,
-              }}
+              style={[
+                styles.tileValueOverlay,
+                { fontSize: size * 0.3 },
+              ]}
             >
               {val}
             </Text>
           )}
 
           {linkedColor && !isFixed && (
-            <View style={[StyleSheet.absoluteFill, {
-              backgroundColor: linkedColor,
-              borderRadius: 6,
-              borderWidth: 1.5,
-              borderColor: linkedColor.replace(/[\d.]+\)$/, '0.6)'),
-            }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: linkedColor,
+                  borderRadius: radii.sm,
+                  borderWidth: 1.5,
+                  borderColor: linkedColor.replace(/[\d.]+\)$/, "0.6)"),
+                },
+              ]}
+            />
           )}
 
           {cageEdges && (
@@ -440,7 +584,10 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, ca
                   pointerEvents="none"
                   style={[
                     StyleSheet.absoluteFillObject,
-                    { backgroundColor: cageEdges.tint, borderRadius: 4 }
+                    {
+                      backgroundColor: cageEdges.tint,
+                      borderRadius: radii.sm - 2,
+                    },
                   ]}
                 />
               )}
@@ -448,12 +595,11 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, ca
                 pointerEvents="none"
                 style={{
                   ...StyleSheet.absoluteFillObject,
-                  borderColor: ui.cageBorder,
-                  borderTopWidth: cageEdges.top ? (ui.name === 'mono' ? 3 : 3.25) : 0,
-                  borderBottomWidth: cageEdges.bottom ? (ui.name === 'mono' ? 3 : 3.25) : 0,
-                  borderLeftWidth: cageEdges.left ? (ui.name === 'mono' ? 3 : 3.25) : 0,
-                  borderRightWidth: cageEdges.right ? (ui.name === 'mono' ? 3 : 3.25) : 0,
-
+                  borderColor: uiTheme.cageBorder,
+                  borderTopWidth: cageEdges.top ? cageBorderThickness : 0,
+                  borderBottomWidth: cageEdges.bottom ? cageBorderThickness : 0,
+                  borderLeftWidth: cageEdges.left ? cageBorderThickness : 0,
+                  borderRightWidth: cageEdges.right ? cageBorderThickness : 0,
                 }}
               />
             </>
@@ -461,22 +607,14 @@ const Tile = ({ val, isFixed, linkedColor, onPress, size, isHinted, hintAnim, ca
 
           {cageEdges?.target !== undefined && (
             <Text
-              style={{
-                position: 'absolute',
-                top: 2,
-                left: 4,
-                fontSize: Math.max(11, size * 0.22),
-                fontWeight: '800',
-                color: ui.textPrimary,
-                textShadowColor: 'rgba(255,255,255,0.9)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 2,
-              }}
+              style={[
+                styles.cageTargetText,
+                { fontSize: Math.max(11, size * 0.22) },
+              ]}
             >
               {cageEdges.target}
             </Text>
           )}
-
         </ImageBackground>
       </Animated.View>
     </TouchableOpacity>
@@ -490,46 +628,196 @@ type WinModalProps = {
   onNext: () => void;
 };
 
-const WinModal = ({ visible, stars, moves, onNext }: WinModalProps) => (
-  <Modal visible={visible} transparent animationType="fade">
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <Text style={styles.winTitle}>Cleared!</Text>
-        <View style={styles.starRow}>
-          {stars.map((anim: any, i: number) => (
-            <Animated.Text key={i} style={[styles.starText, { transform: [{ scale: anim }], opacity: anim }]}>★</Animated.Text>
-          ))}
-        </View>
-        <Text style={styles.statsText}>{moves} moves taken</Text>
-        <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-          <Text style={styles.nextButtonText}>Next Level</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </Modal>
-);
+const WinModal = ({ visible, stars, moves, onNext }: WinModalProps) => {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  header: { marginBottom: 15 },
-  moveText: { fontSize: 18, fontWeight: "800", color: "#495057", letterSpacing: 1 },
-  gameWrapper: { alignItems: "center" },
-  boardRow: { flexDirection: "row", alignItems: "center" },
-  rowIndicators: { alignItems: 'flex-end' },
-  indicatorText: { fontSize: 10, fontWeight: "bold", color: "#adb5bd" },
-  textRed: { color: "#fa5252" },
-  textGreen: { color: "#40c057" },
-  board: { flexDirection: "row", flexWrap: "wrap", backgroundColor: "#f1f3f5", borderRadius: 8, overflow: "hidden" },
-  fullCell: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
-  buttonRow: { flexDirection: "row", marginTop: 30, gap: 12 },
-  actionButton: { paddingVertical: 12, paddingHorizontal: 16, backgroundColor: "#e9ecef", borderRadius: 12, minWidth: 85, alignItems: 'center' },
-  buttonText: { fontWeight: "bold", color: "#495057" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
-  modalContent: { backgroundColor: "white", padding: 40, borderRadius: 24, alignItems: "center", width: "85%" },
-  winTitle: { fontSize: 32, fontWeight: "900", marginBottom: 10, color: "#2f9e44" },
-  starRow: { flexDirection: "row", marginBottom: 15, gap: 8 },
-  starText: { fontSize: 48, color: "#fcc419" },
-  statsText: { fontSize: 16, color: "#868e96", marginBottom: 25 },
-  nextButton: { backgroundColor: "#228be6", paddingVertical: 14, paddingHorizontal: 45, borderRadius: 25 },
-  nextButtonText: { color: "white", fontSize: 18, fontWeight: "bold" }
-});
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.winTitle}>Cleared!</Text>
+          <View style={styles.starRow}>
+            {stars.map((anim: any, i: number) => (
+              <Animated.Text
+                key={i}
+                style={[
+                  styles.starText,
+                  { transform: [{ scale: anim }], opacity: anim },
+                ]}
+              >
+                ★
+              </Animated.Text>
+            ))}
+          </View>
+          <Text style={styles.statsText}>{moves} moves taken</Text>
+          <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+            <Text style={styles.nextButtonText}>Next Level</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const makeStyles = (uiTheme: UITheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: uiTheme.background,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    loadingText: {
+      ...typography.body,
+      color: uiTheme.textMuted,
+    },
+    header: {
+      marginBottom: spacing.lg,
+    },
+    moveText: {
+      ...typography.title,
+      color: uiTheme.textSecondary,
+      letterSpacing: 1,
+    },
+    gameWrapper: {
+      alignItems: "center",
+    },
+    boardRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    rowIndicators: {
+      alignItems: "flex-end",
+    },
+    indicatorText: {
+      ...typography.micro,
+      color: uiTheme.textMuted,
+    },
+    textRed: {
+      color: uiTheme.danger,
+    },
+    textGreen: {
+      color: uiTheme.success,
+    },
+    board: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      backgroundColor: uiTheme.surfaceMuted,
+      borderRadius: radii.md,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+    },
+    fullCell: {
+      width: "100%",
+      height: "100%",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    voidCell: {
+      backgroundColor: uiTheme.textSecondary,
+      opacity: 0.6,
+    },
+    voidCellMark: {
+      color: uiTheme.surface,
+      fontWeight: "800",
+    },
+    tileValueOverlay: {
+      position: "absolute",
+      fontWeight: "900",
+      color: uiTheme.surface,
+      textShadowColor: "rgba(0,0,0,0.6)",
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    cageTargetText: {
+      position: "absolute",
+      top: 2,
+      left: 4,
+      fontWeight: "800",
+      color: uiTheme.textPrimary,
+      textShadowColor:
+        uiTheme.name === "mono"
+          ? "rgba(255,255,255,0.9)"
+          : "rgba(255,255,255,0.85)",
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 2,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      marginTop: spacing.xxl,
+      gap: spacing.md,
+    },
+    actionButton: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.md,
+      minWidth: 85,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      ...shadows.sm,
+    },
+    buttonText: {
+      ...typography.caption,
+      color: uiTheme.textSecondary,
+    },
+    hintButton: {
+      backgroundColor: uiTheme.star,
+      borderColor: uiTheme.star,
+    },
+    hintButtonText: {
+      ...typography.caption,
+      color: uiTheme.name === "mono" ? uiTheme.textPrimary : "#FFFFFF",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.7)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalContent: {
+      backgroundColor: uiTheme.surface,
+      padding: spacing.xxl + spacing.sm,
+      borderRadius: radii.xl,
+      alignItems: "center",
+      width: "85%",
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      ...shadows.md,
+    },
+    winTitle: {
+      ...typography.display,
+      fontSize: 32,
+      color: uiTheme.successDeep,
+      marginBottom: spacing.sm,
+    },
+    starRow: {
+      flexDirection: "row",
+      marginBottom: spacing.md,
+      gap: spacing.sm,
+    },
+    starText: {
+      fontSize: 48,
+      color: uiTheme.star,
+    },
+    statsText: {
+      ...typography.body,
+      color: uiTheme.textMuted,
+      marginBottom: spacing.xl + spacing.xs,
+    },
+    nextButton: {
+      backgroundColor: uiTheme.primary,
+      paddingVertical: spacing.md + 2,
+      paddingHorizontal: spacing.xxl + spacing.md,
+      borderRadius: radii.pill,
+      ...shadows.sm,
+    },
+    nextButtonText: {
+      color: uiTheme.name === "mono" ? uiTheme.surface : "#FFFFFF",
+      fontSize: 18,
+      fontWeight: "bold",
+    },
+  });

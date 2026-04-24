@@ -4,8 +4,10 @@ import LevelSelect from '../components/LevelSelect';
 import { LevelModalProps } from '../navigation/types';
 import { chapters, Level } from '../data/chapters';
 import { getLevelStars } from '../utils/progress';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LevelModalScreen({ route, navigation }: LevelModalProps) {
+  const {ui: uiTheme} = useTheme()
   const { chapterId, themeIndex } = route.params;
   const [levelsWithProgress, setLevelsWithProgress] = useState<(Level & {stars: number})[]>([])
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function LevelModalScreen({ route, navigation }: LevelModalProps)
   return (
     <View style={{ flex: 1 }}>
       {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} size="large" color="#4dabf7" />
+        <ActivityIndicator style={{ flex: 1 }} size="large" color={uiTheme.primary} />
       ) : (
         <LevelSelect
           levels={levelsWithProgress}
