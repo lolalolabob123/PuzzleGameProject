@@ -53,13 +53,11 @@ export default function App() {
               />
             </RootStack.Group>
             
-            <RootStack.Group screenOptions={{ presentation: "modal" }}>
-              <RootStack.Screen
-                name="Game"
-                component={GameScreen}
-                options={{ title: "Puzzle" }}
-              />
-            </RootStack.Group>
+<RootStack.Screen
+  name="Game"
+  component={GameScreen}
+  options={{ title: "Puzzle", headerShown: false }}
+/>
 
             <RootStack.Group screenOptions={{ presentation: 'modal' }}>
               <RootStack.Screen
