@@ -55,15 +55,17 @@ export default function PuzzleBoard({
   // Measure actual available width from layout instead of guessing from Dimensions
   const [containerWidth, setContainerWidth] = useState(0);
 
-  const { cellSize, boardSize } = useMemo(() => {
-    if (containerWidth === 0) return { cellSize: 0, boardSize: 0 };
-    const maxWidth = containerWidth - INDICATOR_WIDTH;
-    const finalCellSize = Math.max(30, Math.floor(maxWidth / size));
-    return { cellSize: finalCellSize, boardSize: finalCellSize * size };
-  }, [containerWidth, size]);
+const { cellSize, boardSize } = useMemo(() => {
+  if (containerWidth === 0) return { cellSize: 0, boardSize: 0 };
+  const PADDING = spacing.lg * 2; // paddingHorizontal applies to both sides
+  const maxWidth = containerWidth - INDICATOR_WIDTH - PADDING;
+  const finalCellSize = Math.max(30, Math.floor(maxWidth / size));
+  return { cellSize: finalCellSize, boardSize: finalCellSize * size };
+}, [containerWidth, size]);
 
   const handleContainerLayout = (e: LayoutChangeEvent) => {
-    const { width } = e.nativeEvent.layout;
+    const { width, height, x, y } = e.nativeEvent.layout;
+    console.log("CONTAINER LAYOUT:", { width, height, x, y });
     if (width > 0) setContainerWidth(width);
   };
 
@@ -417,6 +419,7 @@ export default function PuzzleBoard({
 
               <View
                 style={[styles.board, { width: boardSize, height: boardSize }]}
+                onLayout={(e) => console.log("BOARD LAYOUT:", e.nativeEvent.layout)}
               >
                 {cells.map((val, i) => (
                   <Tile
