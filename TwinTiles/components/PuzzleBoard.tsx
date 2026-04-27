@@ -8,12 +8,11 @@ import {
   Image,
   ImageBackground,
   Animated,
-  Dimensions,
+  LayoutChangeEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
-import { calculateBoardLayout } from "../utils/boardLayout";
 import {
   unlockNextLevel,
   saveLevelState,
@@ -53,17 +52,20 @@ export default function PuzzleBoard({
   const { theme, ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
+  // Measure actual available width from layout instead of guessing from Dimensions
+  const [containerWidth, setContainerWidth] = useState(0);
+
   const { cellSize, boardSize } = useMemo(() => {
-    const SCREEN_PADDING = 32;
-    const screenWidth = Dimensions.get("window").width;
-    const maxWidth = screenWidth - INDICATOR_WIDTH - SCREEN_PADDING;
-    const { cellSize: raw } = calculateBoardLayout(size);
-    const finalCellSize = Math.max(
-      30,
-      Math.min(Math.floor(raw), Math.floor(maxWidth / size))
-    );
+    if (containerWidth === 0) return { cellSize: 0, boardSize: 0 };
+    const maxWidth = containerWidth - INDICATOR_WIDTH;
+    const finalCellSize = Math.max(30, Math.floor(maxWidth / size));
     return { cellSize: finalCellSize, boardSize: finalCellSize * size };
-  }, [size]);
+  }, [containerWidth, size]);
+
+  const handleContainerLayout = (e: LayoutChangeEvent) => {
+    const { width } = e.nativeEvent.layout;
+    if (width > 0) setContainerWidth(width);
+  };
 
   const [cells, setCells] = useState<number[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -345,87 +347,98 @@ export default function PuzzleBoard({
         <Text style={styles.moveText}>MOVES: {moveCount}</Text>
       </View>
 
-      <View style={styles.gameWrapper}>
-        <View style={{ flexDirection: "row" }}>
-          <View style={{ width: INDICATOR_WIDTH }} />
-          <View style={{ flexDirection: "row", width: boardSize }}>
-            {Array.from({ length: size }).map((_, colIdx) => {
-              const col = Array.from({ length: size }).map(
-                (_, r) => cells[r * size + colIdx]
-              );
-              const { isInvalid, isComplete, counts } =
-                getValidationState(col);
-              return (
-                <View
-                  key={colIdx}
-                  style={{ width: cellSize, alignItems: "center" }}
-                >
-                  <Text
-                    style={[
-                      styles.indicatorText,
-                      isInvalid && styles.textRed,
-                      isComplete && styles.textGreen,
-                    ]}
-                  >
-                    {counts.one}
-                    {"\n"}
-                    {counts.two}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+      {/* This View measures the true available width after safe area insets */}
+      <View style={styles.gameWrapper} onLayout={handleContainerLayout}>
+        {containerWidth > 0 && cellSize > 0 && (
+          <>
+            {/* Column indicators */}
+            <View style={{ flexDirection: "row" }}>
+              <View style={{ width: INDICATOR_WIDTH }} />
+              <View style={{ flexDirection: "row", width: boardSize }}>
+                {Array.from({ length: size }).map((_, colIdx) => {
+                  const col = Array.from({ length: size }).map(
+                    (_, r) => cells[r * size + colIdx]
+                  );
+                  const { isInvalid, isComplete, counts } =
+                    getValidationState(col);
+                  return (
+                    <View
+                      key={colIdx}
+                      style={{ width: cellSize, alignItems: "center" }}
+                    >
+                      <Text
+                        style={[
+                          styles.indicatorText,
+                          isInvalid && styles.textRed,
+                          isComplete && styles.textGreen,
+                        ]}
+                      >
+                        {counts.one}
+                        {"\n"}
+                        {counts.two}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
 
-        <Animated.View
-          style={[styles.boardRow, { transform: [{ translateX: shakeAnim }] }]}
-        >
-          <View
-            style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}
-          >
-            {Array.from({ length: size }).map((_, rowIdx) => {
-              const row = cells.slice(rowIdx * size, (rowIdx + 1) * size);
-              const { isInvalid, isComplete, counts } =
-                getValidationState(row);
-              return (
-                <View
-                  key={rowIdx}
-                  style={{ height: cellSize, justifyContent: "center" }}
-                >
-                  <Text
-                    style={[
-                      styles.indicatorText,
-                      { textAlign: "right", paddingRight: 8 },
-                      isInvalid && styles.textRed,
-                      isComplete && styles.textGreen,
-                    ]}
-                  >
-                    {counts.one}|{counts.two}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+            {/* Board row with row indicators */}
+            <Animated.View
+              style={[
+                styles.boardRow,
+                { transform: [{ translateX: shakeAnim }] },
+              ]}
+            >
+              <View style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}>
+                {Array.from({ length: size }).map((_, rowIdx) => {
+                  const row = cells.slice(rowIdx * size, (rowIdx + 1) * size);
+                  const { isInvalid, isComplete, counts } =
+                    getValidationState(row);
+                  return (
+                    <View
+                      key={rowIdx}
+                      style={{ height: cellSize, justifyContent: "center" }}
+                    >
+                      <Text
+                        style={[
+                          styles.indicatorText,
+                          { textAlign: "right", paddingRight: 8 },
+                          isInvalid && styles.textRed,
+                          isComplete && styles.textGreen,
+                        ]}
+                      >
+                        {counts.one}|{counts.two}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
 
-          <View style={[styles.board, { width: boardSize, height: boardSize }]}>
-            {cells.map((val, i) => (
-              <Tile
-                key={i}
-                val={val}
-                isFixed={gridData[i] !== 0}
-                linkedColor={
-                  levelData.links?.find((g) => g.indices.includes(i))?.color
-                }
-                onPress={() => cycleCell(i)}
-                size={cellSize}
-                isHinted={hintIndex === i}
-                hintAnim={hintPulse}
-                cageEdges={getCageEdges(i)}
-                chapterId={chapterId}
-              />
-            ))}
-          </View>
-        </Animated.View>
+              <View
+                style={[styles.board, { width: boardSize, height: boardSize }]}
+              >
+                {cells.map((val, i) => (
+                  <Tile
+                    key={i}
+                    val={val}
+                    isFixed={gridData[i] !== 0}
+                    linkedColor={
+                      levelData.links?.find((g) => g.indices.includes(i))
+                        ?.color
+                    }
+                    onPress={() => cycleCell(i)}
+                    size={cellSize}
+                    isHinted={hintIndex === i}
+                    hintAnim={hintPulse}
+                    cageEdges={getCageEdges(i)}
+                    chapterId={chapterId}
+                  />
+                ))}
+              </View>
+            </Animated.View>
+          </>
+        )}
       </View>
 
       <View style={styles.buttonRow}>
@@ -519,7 +532,9 @@ const Tile = ({
             { borderRadius: radii.sm },
           ]}
         >
-          <Text style={[styles.voidCellMark, { fontSize: size * 0.4 }]}>×</Text>
+          <Text style={[styles.voidCellMark, { fontSize: size * 0.4 }]}>
+            ×
+          </Text>
         </View>
       </View>
     );
@@ -553,12 +568,7 @@ const Tile = ({
           )}
 
           {val !== 0 && chapterId === 4 && (
-            <Text
-              style={[
-                styles.tileValueOverlay,
-                { fontSize: size * 0.3 },
-              ]}
-            >
+            <Text style={[styles.tileValueOverlay, { fontSize: size * 0.3 }]}>
               {val}
             </Text>
           )}
@@ -597,7 +607,9 @@ const Tile = ({
                   ...StyleSheet.absoluteFillObject,
                   borderColor: uiTheme.cageBorder,
                   borderTopWidth: cageEdges.top ? cageBorderThickness : 0,
-                  borderBottomWidth: cageEdges.bottom ? cageBorderThickness : 0,
+                  borderBottomWidth: cageEdges.bottom
+                    ? cageBorderThickness
+                    : 0,
                   borderLeftWidth: cageEdges.left ? cageBorderThickness : 0,
                   borderRightWidth: cageEdges.right ? cageBorderThickness : 0,
                 }}
@@ -665,8 +677,6 @@ const makeStyles = (uiTheme: UITheme) =>
     container: {
       flex: 1,
       backgroundColor: uiTheme.background,
-      alignItems: "center",
-      justifyContent: "center",
     },
     loadingText: {
       ...typography.body,
@@ -674,6 +684,7 @@ const makeStyles = (uiTheme: UITheme) =>
     },
     header: {
       marginBottom: spacing.lg,
+      alignSelf: "center"
     },
     moveText: {
       ...typography.title,
@@ -681,11 +692,12 @@ const makeStyles = (uiTheme: UITheme) =>
       letterSpacing: 1,
     },
     gameWrapper: {
+      alignSelf: "stretch",
       alignItems: "center",
+      paddingHorizontal: spacing.lg,
     },
     boardRow: {
       flexDirection: "row",
-      alignItems: "center",
     },
     rowIndicators: {
       alignItems: "flex-end",
@@ -748,6 +760,8 @@ const makeStyles = (uiTheme: UITheme) =>
       flexDirection: "row",
       marginTop: spacing.xxl,
       gap: spacing.md,
+      alignSelf: "center",
+      justifyContent: "center"
     },
     actionButton: {
       paddingVertical: spacing.md,
