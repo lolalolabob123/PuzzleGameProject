@@ -55,13 +55,23 @@ export default function PuzzleBoard({
   // Measure actual available width from layout instead of guessing from Dimensions
   const [containerWidth, setContainerWidth] = useState(0);
 
-const { cellSize, boardSize } = useMemo(() => {
-  if (containerWidth === 0) return { cellSize: 0, boardSize: 0 };
-  const PADDING = spacing.lg * 2; // paddingHorizontal applies to both sides
-  const maxWidth = containerWidth - INDICATOR_WIDTH - PADDING;
-  const finalCellSize = Math.max(30, Math.floor(maxWidth / size));
-  return { cellSize: finalCellSize, boardSize: finalCellSize * size };
-}, [containerWidth, size]);
+  const { cellSize, boardSize } = useMemo(() => {
+    if (containerWidth === 0) return { cellSize: 0, boardSize: 0 };
+    const PADDING = spacing.lg * 2; // paddingHorizontal applies to both sides
+    const BOARD_BORDER = 2; // styles.board has borderWidth: 1 on each side
+    const maxWidth = containerWidth - INDICATOR_WIDTH - PADDING;
+    const finalCellSize = Math.max(
+      30,
+      Math.floor((maxWidth - BOARD_BORDER) / size)
+    );
+    // Board's outer width must include the border so the inner content area
+    // is exactly cellSize * size — otherwise the last column wraps and gets
+    // clipped by overflow:hidden.
+    return {
+      cellSize: finalCellSize,
+      boardSize: finalCellSize * size + BOARD_BORDER,
+    };
+  }, [containerWidth, size]);
 
   const handleContainerLayout = (e: LayoutChangeEvent) => {
     const { width, height, x, y } = e.nativeEvent.layout;
@@ -259,7 +269,7 @@ const { cellSize, boardSize } = useMemo(() => {
     if (isInitializing || hasWonRef.current || cells.length === 0) return;
     if (cells.every((c) => c !== 0)) {
       if (checkWin(cells)) handleWin();
-      else triggerShake();
+      else if(suspectCellIndices.size === 0) triggerShake();
     }
   }, [cells, isInitializing, checkWin]);
 
@@ -302,6 +312,32 @@ const { cellSize, boardSize } = useMemo(() => {
     }
     return { byIndex, targetByIndex, colorByIndex };
   }, [levelData.cages, size, uiTheme]);
+
+  const suspectCellIndices = useMemo(() => {
+    const empty = new Set<number>()
+    if (!cells.length || cells.some((c) => c === 0)) return empty
+    if (!levelData.cages) return empty
+
+    for (let i = 0; i < size; i++) {
+      const row = cells.slice(i * size, (i + 1) * size)
+      const col = Array.from({length: size}, (_, r) => cells[r * size + i])
+      if (!getValidationState(row).isComplete) return empty
+      if (!getValidationState(col).isComplete )return empty
+    }
+
+    const suspect = new Set<number>()
+    for (const cage of levelData.cages) {
+      if (cage.target === undefined) continue
+      const sum = cage.indices.reduce(
+        (acc, idx) => acc + (cells[idx] > 0 ? cells[idx] : 0),
+        0
+      )
+      if (sum !== cage.target) {
+        cage.indices.forEach((i) => suspect.add(i))
+      }
+    }
+    return suspect
+  }, [cells, size, getValidationState, levelData.cages])
 
   const getCageEdges = useCallback(
     (index: number) => {
@@ -356,7 +392,13 @@ const { cellSize, boardSize } = useMemo(() => {
             {/* Column indicators */}
             <View style={{ flexDirection: "row" }}>
               <View style={{ width: INDICATOR_WIDTH }} />
-              <View style={{ flexDirection: "row", width: boardSize }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  width: boardSize,
+                  paddingHorizontal: 1, // align with board's inner content (1px border)
+                }}
+              >
                 {Array.from({ length: size }).map((_, colIdx) => {
                   const col = Array.from({ length: size }).map(
                     (_, r) => cells[r * size + colIdx]
@@ -392,7 +434,15 @@ const { cellSize, boardSize } = useMemo(() => {
                 { transform: [{ translateX: shakeAnim }] },
               ]}
             >
-              <View style={[styles.rowIndicators, { width: INDICATOR_WIDTH }]}>
+              <View
+                style={[
+                  styles.rowIndicators,
+                  {
+                    width: INDICATOR_WIDTH,
+                    paddingVertical: 1, // align with board's inner content (1px border)
+                  },
+                ]}
+              >
                 {Array.from({ length: size }).map((_, rowIdx) => {
                   const row = cells.slice(rowIdx * size, (rowIdx + 1) * size);
                   const { isInvalid, isComplete, counts } =
@@ -436,6 +486,7 @@ const { cellSize, boardSize } = useMemo(() => {
                     hintAnim={hintPulse}
                     cageEdges={getCageEdges(i)}
                     chapterId={chapterId}
+                    isWrong={suspectCellIndices.has(i)}
                   />
                 ))}
               </View>
@@ -509,6 +560,7 @@ type TileProps = {
     tint?: string;
   } | null;
   chapterId: number;
+  isWrong: boolean;
 };
 
 const Tile = ({
@@ -521,6 +573,7 @@ const Tile = ({
   hintAnim,
   cageEdges,
   chapterId,
+  isWrong,
 }: TileProps) => {
   const { theme, ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
@@ -629,6 +682,18 @@ const Tile = ({
             >
               {cageEdges.target}
             </Text>
+          )}
+          {isWrong && (
+            <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                borderRadius: radii.sm,
+                borderWidth: 3,
+                borderColor: uiTheme.danger,
+              }
+            ]}></View>
           )}
         </ImageBackground>
       </Animated.View>
