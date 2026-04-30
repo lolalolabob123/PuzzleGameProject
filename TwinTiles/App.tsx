@@ -5,6 +5,7 @@ import HomeScreen from "./tabs/Home";
 import ChapterSelect from "./tabs/ChapterSelect";
 import LevelModalScreen from "./screens/LevelModal";
 import GameScreen from './components/GameScreen'
+import Shop from "./tabs/Shop"
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RootStackParamList, TabParamList } from "./navigation/types";
 import { FontAwesome } from "@expo/vector-icons";
@@ -26,6 +27,8 @@ function Tabs() {
             iconName = "home";
           } else if (route.name === "Chapters") {
             iconName = "th-large";
+          } else if (route.name === "Shop") {
+            iconName = "shopping-bag";
           }
 
           return <FontAwesome name={iconName} size={size} color={color} />;
@@ -36,13 +39,14 @@ function Tabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Chapters" component={ChapterSelect} />
+      <Tab.Screen name="Shop" component={Shop}/>
     </Tab.Navigator>
   );
 }
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider> 
+      <ThemeProvider>
         <NavigationContainer>
           <RootStack.Navigator>
             <RootStack.Group>
@@ -52,18 +56,18 @@ export default function App() {
                 options={{ headerShown: false }}
               />
             </RootStack.Group>
-            
-<RootStack.Screen
-  name="Game"
-  component={GameScreen}
-  options={{ title: "Puzzle", headerShown: false }}
-/>
+
+            <RootStack.Screen
+              name="Game"
+              component={GameScreen}
+              options={{ title: "Puzzle", headerShown: false }}
+            />
 
             <RootStack.Group screenOptions={{ presentation: 'modal' }}>
               <RootStack.Screen
                 name="LevelModal"
                 component={LevelModalScreen}
-                options={{ title: 'Select a Level' }} 
+                options={{ title: 'Select a Level' }}
               />
             </RootStack.Group>
           </RootStack.Navigator>

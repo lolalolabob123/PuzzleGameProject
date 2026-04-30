@@ -5,7 +5,8 @@ import { BottomTabsScreen } from "react-native-screens";
 
 export type TabParamList = {
   Home: undefined;
-  Chapters: {themeIndex?: number}
+  Chapters: {themeIndex?: number};
+  Shop: undefined;
 };
 
 export type RootStackParamList = {

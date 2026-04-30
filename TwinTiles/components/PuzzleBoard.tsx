@@ -90,6 +90,7 @@ export default function PuzzleBoard({
   const hasWonRef = useRef(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const hintPulse = useRef(new Animated.Value(1)).current;
+  const wrongPulse = useRef(new Animated.Value(1)).current;
   const starAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -265,6 +266,32 @@ export default function PuzzleBoard({
     init();
   }, [level, chapterId, forcedReset, JSON.stringify(levelData?.grid)]);
 
+    const suspectCellIndices = useMemo(() => {
+    const empty = new Set<number>()
+    if (!cells.length || cells.some((c) => c === 0)) return empty
+    if (!levelData.cages) return empty
+
+    for (let i = 0; i < size; i++) {
+      const row = cells.slice(i * size, (i + 1) * size)
+      const col = Array.from({length: size}, (_, r) => cells[r * size + i])
+      if (!getValidationState(row).isComplete) return empty
+      if (!getValidationState(col).isComplete )return empty
+    }
+
+    const suspect = new Set<number>()
+    for (const cage of levelData.cages) {
+      if (cage.target === undefined) continue
+      const sum = cage.indices.reduce(
+        (acc, idx) => acc + (cells[idx] > 0 ? cells[idx] : 0),
+        0
+      )
+      if (sum !== cage.target) {
+        cage.indices.forEach((i) => suspect.add(i))
+      }
+    }
+    return suspect
+  }, [cells, size, getValidationState, levelData.cages])
+
   useEffect(() => {
     if (isInitializing || hasWonRef.current || cells.length === 0) return;
     if (cells.every((c) => c !== 0)) {
@@ -272,6 +299,35 @@ export default function PuzzleBoard({
       else if(suspectCellIndices.size === 0) triggerShake();
     }
   }, [cells, isInitializing, checkWin]);
+
+  useEffect(() => {
+    if (suspectCellIndices.size === 0) {
+      wrongPulse.setValue(1)
+      return
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wrongPulse, {
+          toValue: 0.35,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(wrongPulse, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ])
+    )
+
+    animation.start()
+
+    return () => {
+      animation.stop()
+      wrongPulse.setValue(1)
+    }
+  }, [suspectCellIndices, wrongPulse])
 
   const handleReset = () => {
     const fresh = [...gridData];
@@ -312,32 +368,6 @@ export default function PuzzleBoard({
     }
     return { byIndex, targetByIndex, colorByIndex };
   }, [levelData.cages, size, uiTheme]);
-
-  const suspectCellIndices = useMemo(() => {
-    const empty = new Set<number>()
-    if (!cells.length || cells.some((c) => c === 0)) return empty
-    if (!levelData.cages) return empty
-
-    for (let i = 0; i < size; i++) {
-      const row = cells.slice(i * size, (i + 1) * size)
-      const col = Array.from({length: size}, (_, r) => cells[r * size + i])
-      if (!getValidationState(row).isComplete) return empty
-      if (!getValidationState(col).isComplete )return empty
-    }
-
-    const suspect = new Set<number>()
-    for (const cage of levelData.cages) {
-      if (cage.target === undefined) continue
-      const sum = cage.indices.reduce(
-        (acc, idx) => acc + (cells[idx] > 0 ? cells[idx] : 0),
-        0
-      )
-      if (sum !== cage.target) {
-        cage.indices.forEach((i) => suspect.add(i))
-      }
-    }
-    return suspect
-  }, [cells, size, getValidationState, levelData.cages])
 
   const getCageEdges = useCallback(
     (index: number) => {
@@ -487,6 +517,7 @@ export default function PuzzleBoard({
                     cageEdges={getCageEdges(i)}
                     chapterId={chapterId}
                     isWrong={suspectCellIndices.has(i)}
+                    wrongAnim={wrongPulse}
                   />
                 ))}
               </View>
@@ -561,6 +592,7 @@ type TileProps = {
   } | null;
   chapterId: number;
   isWrong: boolean;
+  wrongAnim: Animated.Value;
 };
 
 const Tile = ({
@@ -574,6 +606,7 @@ const Tile = ({
   cageEdges,
   chapterId,
   isWrong,
+  wrongAnim,
 }: TileProps) => {
   const { theme, ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
@@ -684,7 +717,7 @@ const Tile = ({
             </Text>
           )}
           {isWrong && (
-            <View
+            <Animated.View
             pointerEvents="none"
             style={[
               StyleSheet.absoluteFillObject,
@@ -693,7 +726,7 @@ const Tile = ({
                 borderWidth: 3,
                 borderColor: uiTheme.danger,
               }
-            ]}></View>
+            ]}></Animated.View>
           )}
         </ImageBackground>
       </Animated.View>
