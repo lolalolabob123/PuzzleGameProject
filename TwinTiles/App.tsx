@@ -10,6 +10,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RootStackParamList, TabParamList } from "./navigation/types";
 import { FontAwesome } from "@expo/vector-icons";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ProfileProvider } from "./context/ProfileContext";
+import ProfileGate from "./components/ProfileGate"
+import Achievements from "./tabs/Achievements";
 
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -27,6 +30,8 @@ function Tabs() {
             iconName = "home";
           } else if (route.name === "Chapters") {
             iconName = "th-large";
+          } else if (route.name === "Achievements") {
+            iconName = "trophy"
           } else if (route.name === "Shop") {
             iconName = "shopping-bag";
           }
@@ -39,6 +44,7 @@ function Tabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Chapters" component={ChapterSelect} />
+      <Tab.Screen name="Achievements" component={Achievements}/>
       <Tab.Screen name="Shop" component={Shop}/>
     </Tab.Navigator>
   );
@@ -47,6 +53,8 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
+        <ProfileProvider>
+        <ProfileGate>
         <NavigationContainer>
           <RootStack.Navigator>
             <RootStack.Group>
@@ -72,6 +80,8 @@ export default function App() {
             </RootStack.Group>
           </RootStack.Navigator>
         </NavigationContainer>
+        </ProfileGate>
+        </ProfileProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

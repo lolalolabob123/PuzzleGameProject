@@ -11,6 +11,9 @@ import { GameTheme } from "../constants/themes";
 import { useFocusEffect } from "@react-navigation/native";
 import { getOwnedItemIds } from "../utils/coins";
 import { SHOP_ITEMS } from "../data/shopItems";
+import {useProfile} from "../context/ProfileContext"
+import { AVAILABLE_AVATARS } from "../data/avatars";
+import ProfileSetup from "../components/ProfileSetup"
 
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
@@ -53,6 +56,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { themeIndex, setTheme } = useTheme();
   const currentTheme = AVAILABLE_THEMES[themeIndex];
   const [ownedThemeIds, setOwnedThemeIds] = useState<string[]>([])
+  const {profile} = useProfile()
+  const useAvatar = AVAILABLE_AVATARS.find(a => a.id === profile?.avatarId) ?? AVAILABLE_AVATARS[0]
+  const [editProfileVisible, setEditProfileVisisble] = useState(false)
 
   const handleResetChapter = () => {
     universalAlert(
@@ -86,7 +92,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       },
       true
     );
-  };
+  };  
 
   useFocusEffect(
     useCallback(() => {
@@ -103,6 +109,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     <Modal visible={profileMenuVisible} transparent animationType="fade">
       <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
         <View style={styles.profileMenu}>
+          <MenuOption icon="user" label="Edit Profile" onPress={() => {
+            setProfileMenuVisible(false)
+            setEditProfileVisisble(true)
+          }}/>
+          <Modal visible={editProfileVisible} animationType="slide" presentationStyle="pageSheet">
+            <ProfileSetup
+              initialName={profile?.name}
+              initialAvatarId={profile?.avatarId}
+              onComplete={() => setEditProfileVisisble(false)}/>
+          </Modal>
+          <View style={styles.menuDivider}/>
           <MenuOption icon="cog" label="Settings" onPress={() => { setProfileMenuVisible(false); setSettingsVisible(true); }} />
           <View style={styles.menuDivider} />
           <MenuOption icon="refresh" label="Reset Chapter 1" color="#f08c00" onPress={handleResetChapter} />
@@ -121,7 +138,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setProfileMenuVisible(true)}>
-          <FontAwesome name="user-circle" size={40} color="black" />
+          <View style={[styles.headerAvatar, {backgroundColor: useAvatar.color}]}>
+            <FontAwesome name={useAvatar.iconName as any} size={20} color="#FFFFF"/>
+          </View>
         </TouchableOpacity>
       </View>
       <View style={styles.rankContainer}>
@@ -267,4 +286,5 @@ const styles = StyleSheet.create({
   ruleDetail: { fontSize: 14, color: '#868e96', lineHeight: 20 },
   lockedCard: { opacity: 0.6, },
   lockOverlay: { position: 'absolute', top: 6, right: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', },
+  headerAvatar: {width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center'}
 });

@@ -7,6 +7,8 @@ import {
   Modal,
   Animated,
   LayoutChangeEvent,
+  Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -26,6 +28,7 @@ import { useTheme } from "../context/ThemeContext";
 import { Level } from "../data/chapters";
 import { colorCages } from "../utils/levelGenerator";
 import { getEffectCount, incrementEffect } from "../utils/coins"
+import { checkAndGrantAchievements } from "../utils/achievements";
 import {
   spacing,
   radii,
@@ -225,6 +228,13 @@ export default function PuzzleBoard({
 
     await saveLevelStars(chapterId, level, stars);
     await unlockNextLevel(chapterId, level);
+
+    const newlyEarned = await checkAndGrantAchievements()
+    if (newlyEarned.length > 0) {
+      const list = newlyEarned.map(a => `🏆 ${a.title} (+${a.reward} coins)`).join("\n")
+      Platform.OS === "web" ? window.alert(list) : Alert.alert("Achievement unlocked!", list)
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setWinModalVisible(true);
 
