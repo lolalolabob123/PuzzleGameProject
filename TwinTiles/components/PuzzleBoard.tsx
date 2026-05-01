@@ -5,8 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Image,
-  ImageBackground,
   Animated,
   LayoutChangeEvent,
 } from "react-native";
@@ -27,7 +25,7 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { Level } from "../data/chapters";
 import { colorCages } from "../utils/levelGenerator";
-import {getEffectCount, incrementEffect} from "../utils/coins"
+import { getEffectCount, incrementEffect } from "../utils/coins"
 import {
   spacing,
   radii,
@@ -116,7 +114,7 @@ export default function PuzzleBoard({
     const m = Math.floor(total / 60)
     const s = total % 60
     return m > 0 ? `${m}m ${s}s` : `${s}s`
-  } 
+  }
 
   const getValidationState = useCallback(
     (arr: number[]) => {
@@ -290,16 +288,16 @@ export default function PuzzleBoard({
     init();
   }, [level, chapterId, forcedReset, JSON.stringify(levelData?.grid)]);
 
-    const suspectCellIndices = useMemo(() => {
+  const suspectCellIndices = useMemo(() => {
     const empty = new Set<number>()
     if (!cells.length || cells.some((c) => c === 0)) return empty
     if (!levelData.cages) return empty
 
     for (let i = 0; i < size; i++) {
       const row = cells.slice(i * size, (i + 1) * size)
-      const col = Array.from({length: size}, (_, r) => cells[r * size + i])
+      const col = Array.from({ length: size }, (_, r) => cells[r * size + i])
       if (!getValidationState(row).isComplete) return empty
-      if (!getValidationState(col).isComplete )return empty
+      if (!getValidationState(col).isComplete) return empty
     }
 
     const suspect = new Set<number>()
@@ -320,7 +318,7 @@ export default function PuzzleBoard({
     if (isInitializing || hasWonRef.current || cells.length === 0) return;
     if (cells.every((c) => c !== 0)) {
       if (checkWin(cells)) handleWin();
-      else if(suspectCellIndices.size === 0) triggerShake();
+      else if (suspectCellIndices.size === 0) triggerShake();
     }
   }, [cells, isInitializing, checkWin]);
 
@@ -591,8 +589,8 @@ export default function PuzzleBoard({
             await refreshHintState()
 
             Animated.sequence([
-              Animated.timing(hintPulse, {toValue: 1.3, duration: 300, useNativeDriver: true}),
-              Animated.timing(hintPulse, {toValue: 1.0, duration: 300, useNativeDriver: true}),
+              Animated.timing(hintPulse, { toValue: 1.3, duration: 300, useNativeDriver: true }),
+              Animated.timing(hintPulse, { toValue: 1.0, duration: 300, useNativeDriver: true }),
             ]).start(() => setHintIndex(null))
           }}
         >
@@ -676,19 +674,27 @@ const Tile = ({
       <Animated.View
         style={[{ flex: 1 }, isHinted && { transform: [{ scale: hintAnim }] }]}
       >
-        <ImageBackground
-          source={theme.tileBg}
-          style={styles.fullCell}
-          imageStyle={{
-            opacity: isFixed ? 0.5 : 1,
-            borderRadius: radii.sm,
-          }}
+        <View
+          style={[
+            styles.fullCell,
+            {
+              backgroundColor: theme.tileColor,
+              borderRadius: radii.sm,
+              borderWidth: 1.5,
+              borderColor: theme.tileEdgeColor,
+              opacity: isFixed ? 0.65 : 1,
+            },
+          ]}
         >
           {val !== 0 && (
-            <Image
-              source={val === 1 ? theme.shape1 : theme.shape2}
-              style={{ width: size * 0.65, height: size * 0.65 }}
-              resizeMode="contain"
+            <View
+              style={{
+                width: size * 0.6,
+                height: size * 0.6,
+                borderRadius: size * 0.3,
+                backgroundColor: val === 1 ? theme.shape1Color : theme.shape2Color,
+                ...shadows.sm,
+              }}
             />
           )}
 
@@ -754,17 +760,17 @@ const Tile = ({
           )}
           {isWrong && (
             <Animated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                borderRadius: radii.sm,
-                borderWidth: 3,
-                borderColor: uiTheme.danger,
-              }
-            ]}></Animated.View>
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                {
+                  borderRadius: radii.sm,
+                  borderWidth: 3,
+                  borderColor: uiTheme.danger,
+                }
+              ]}></Animated.View>
           )}
-        </ImageBackground>
+        </View>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -972,9 +978,9 @@ const makeStyles = (uiTheme: UITheme) =>
       fontWeight: "bold",
     },
     hintCountdownText: {
-  ...typography.micro,
-  color: uiTheme.name === 'mono' ? uiTheme.textPrimary : '#FFFFFF',
-  marginTop: 1,
-  opacity: 0.85,
-},
+      ...typography.micro,
+      color: uiTheme.name === 'mono' ? uiTheme.textPrimary : '#FFFFFF',
+      marginTop: 1,
+      opacity: 0.85,
+    },
   });

@@ -211,9 +211,21 @@ const SettingsContent = ({ currentTheme, onThemeSelect, onClose, ownedThemeIds }
                 else universalNotify("Locked", "Buy this theme in the Shop.")
               }}
             >
-              <View style={styles.previewContainer}>
-                <Image source={theme.shape1} style={styles.miniShape} />
-                <Image source={theme.shape2} style={styles.miniShape} />
+              <View
+                style={[
+                  styles.previewContainer,
+                  {
+                    backgroundColor: theme.tileColor,
+                    borderColor: theme.tileEdgeColor,
+                  },
+                ]}
+              >
+                <View
+                  style={[styles.miniShape, { backgroundColor: theme.shape1Color }]}
+                />
+                <View
+                  style={[styles.miniShape, { backgroundColor: theme.shape2Color }]}
+                />
               </View>
               <Text style={styles.themeLabel}>{theme.label}</Text>
               {!unlocked && (
@@ -247,12 +259,12 @@ const styles = StyleSheet.create({
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   themeCard: { width: '48%', backgroundColor: 'white', borderRadius: 16, padding: 15, marginBottom: 15, alignItems: 'center', borderWidth: 2, borderColor: '#e9ecef' },
   activeCard: { borderColor: '#4dabf7', backgroundColor: '#e7f5ff' },
-  previewContainer: { flexDirection: 'row', marginBottom: 10 },
-  miniShape: { width: 30, height: 30, marginHorizontal: 3 },
+  previewContainer: { flexDirection: 'row', marginBottom: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, gap: 8 },
+  miniShape: { width: 26, height: 26, borderRadius: 13},
   themeLabel: { fontSize: 14, fontWeight: '600', color: '#495057' },
   ruleItem: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#4dabf7' },
   ruleTitle: { fontSize: 16, fontWeight: 'bold', color: '#343a40', marginBottom: 5 },
   ruleDetail: { fontSize: 14, color: '#868e96', lineHeight: 20 },
-  lockedCard: { opacity: 0.6,},
-  lockOverlay: {position: 'absolute', top: 6, right: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center',},
+  lockedCard: { opacity: 0.6, },
+  lockOverlay: { position: 'absolute', top: 6, right: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', },
 });
