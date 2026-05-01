@@ -22,6 +22,7 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { Level } from "../data/chapters";
 import { colorCages } from "../utils/levelGenerator";
+import {getEffectCount, incrementEffect} from "../utils/coins"
 import {
   spacing,
   radii,
@@ -84,6 +85,7 @@ export default function PuzzleBoard({
   const [winModalVisible, setWinModalVisible] = useState(false);
   const [history, setHistory] = useState<number[][]>([]);
   const [hintsLeft, setHintsLeft] = useState(3);
+  const [extraHints, setExtraHints] = useState(0)
   const [hintIndex, setHintIndex] = useState<number | null>(null);
   const [moveCount, setMoveCount] = useState(0);
 
@@ -249,6 +251,9 @@ export default function PuzzleBoard({
       setHintsLeft(3);
       hasWonRef.current = false;
       starAnims.forEach((a) => a.setValue(0));
+
+      const purchasedHints = await getEffectCount("extra-hints")
+      setExtraHints(purchasedHints)
 
       const saved = await getLevelState(chapterId, level);
       const safeSaved = saved || [];
@@ -546,28 +551,30 @@ export default function PuzzleBoard({
 
         <TouchableOpacity
           style={[styles.actionButton, styles.hintButton]}
-          onPress={() => {
-            if (hintsLeft <= 0) return;
-            const target = cells.findIndex((c) => c === 0);
-            if (target !== -1) {
-              setHintIndex(target);
-              setHintsLeft((h) => h - 1);
-              Animated.sequence([
-                Animated.timing(hintPulse, {
-                  toValue: 1.3,
-                  duration: 300,
-                  useNativeDriver: true,
-                }),
-                Animated.timing(hintPulse, {
-                  toValue: 1.0,
-                  duration: 300,
-                  useNativeDriver: true,
-                }),
-              ]).start(() => setHintIndex(null));
-            }
+          onPress={async () => {
+            const totalAvailable = hintsLeft + extraHints
+            if (totalAvailable <= 0) return
+
+          const target = cells.findIndex((c) => c === 0)
+          if (target === -1) return
+
+          setHintIndex(target)
+
+          if (hintsLeft > 0) {
+            setHintsLeft((h) => h - 1)
+          } else {
+            setExtraHints((e) => e - 1)
+            await incrementEffect("extra-hints", -1)
+          }
+          Animated.sequence([
+            Animated.timing(hintPulse, {toValue: 1.3, duration: 300, useNativeDriver: true}),
+            Animated.timing(hintPulse, {toValue: 1.0, duration: 300, useNativeDriver: true}),
+          ]).start(() => setHintIndex(null))
           }}
         >
-          <Text style={styles.hintButtonText}>Hint ({hintsLeft})</Text>
+          <Text style={styles.hintButtonText}>
+            Hint {hintsLeft + extraHints}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

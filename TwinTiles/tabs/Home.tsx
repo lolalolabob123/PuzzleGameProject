@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Image, Alert, Platform, LogBox } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from "@expo/vector-icons";
@@ -8,6 +8,9 @@ import { useTheme } from "../context/ThemeContext";
 import { resetChapterProgress, clearAllGameData } from "../utils/progress";
 import { HomeScreenProps } from "../navigation/types";
 import { GameTheme } from "../constants/themes";
+import { useFocusEffect } from "@react-navigation/native";
+import { getOwnedItemIds } from "../utils/coins";
+import { SHOP_ITEMS } from "../data/shopItems";
 
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
@@ -34,12 +37,22 @@ const universalNotify = (title: string, message: string) => {
   Platform.OS === 'web' ? window.alert(message) : Alert.alert(title, message);
 };
 
+const PAID_THEME_IDS = new Set(
+  SHOP_ITEMS.filter(i => i.category === "theme").map(i => i.id)
+)
+
+const isThemeUnlocked = (themeId: string, owned: string[]) => {
+  if (!PAID_THEME_IDS.has(themeId)) return true
+  return owned.includes(themeId)
+}
+
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [infoVisible, setInfoVisible] = useState(false)
   const { themeIndex, setTheme } = useTheme();
   const currentTheme = AVAILABLE_THEMES[themeIndex];
+  const [ownedThemeIds, setOwnedThemeIds] = useState<string[]>([])
 
   const handleResetChapter = () => {
     universalAlert(
@@ -49,14 +62,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         // 1. Clear the actual data
         await resetChapterProgress(1);
         setProfileMenuVisible(false);
-
-        // 2. Refresh the UI by re-navigating with a new key
-        // This targets the RootStack, not the Tab stack
         setTimeout(() => {
           navigation.navigate("LevelModal", {
             chapterId: 1,
             themeIndex: themeIndex,
-            refreshKey: Date.now().toString() // This kills the old view cache
+            refreshKey: Date.now().toString()
           });
           universalNotify("Success", "Progress reset.");
         }, 150);
@@ -77,6 +87,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       true
     );
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const owned = await getOwnedItemIds()
+        if (!cancelled) setOwnedThemeIds(owned)
+      })();
+      return () => { cancelled = true }
+    }, [])
+  )
 
   const renderProfileMenu = () => (
     <Modal visible={profileMenuVisible} transparent animationType="fade">
@@ -110,17 +131,21 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       {renderProfileMenu()}
 
       <Modal visible={infoVisible} animationType="slide" presentationStyle="pageSheet">
-        <HowToPlay onClose={() => setInfoVisible(false)}/>
+        <HowToPlay onClose={() => setInfoVisible(false)} />
       </Modal>
 
       <Modal visible={settingsVisible} animationType="slide" presentationStyle="pageSheet">
-        <SettingsContent currentTheme={currentTheme} onThemeSelect={setTheme} onClose={() => setSettingsVisible(false)} />
+        <SettingsContent
+          currentTheme={currentTheme}
+          onThemeSelect={setTheme}
+          onClose={() => setSettingsVisible(false)}
+          ownedThemeIds={ownedThemeIds} />
       </Modal>
     </SafeAreaView>
   );
 }
 
-const HowToPlay = ({ onClose }: {onClose: () => void}) => (
+const HowToPlay = ({ onClose }: { onClose: () => void }) => (
   <View style={styles.settingsPage}>
     <View style={styles.settingsHeader}>
       <Text style={styles.settingsTitle}>How to Play</Text>
@@ -159,8 +184,10 @@ type SettingsContentProps = {
   currentTheme: GameTheme;
   onThemeSelect: (index: number) => void;
   onClose: () => void;
+  ownedThemeIds: string[];
 };
-const SettingsContent = ({ currentTheme, onThemeSelect, onClose }: SettingsContentProps) => (
+
+const SettingsContent = ({ currentTheme, onThemeSelect, onClose, ownedThemeIds }: SettingsContentProps) => (
   <View style={styles.settingsPage}>
     <View style={styles.settingsHeader}>
       <Text style={styles.settingsTitle}>Settings</Text>
@@ -169,15 +196,34 @@ const SettingsContent = ({ currentTheme, onThemeSelect, onClose }: SettingsConte
     <ScrollView showsVerticalScrollIndicator={false}>
       <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
       <View style={styles.themeGrid}>
-        {AVAILABLE_THEMES.map((theme, index) => (
-          <TouchableOpacity key={theme.id} style={[styles.themeCard, currentTheme.id === theme.id && styles.activeCard]} onPress={() => onThemeSelect(index)}>
-            <View style={styles.previewContainer}>
-              <Image source={theme.shape1} style={styles.miniShape} />
-              <Image source={theme.shape2} style={styles.miniShape} />
-            </View>
-            <Text style={styles.themeLabel}>{theme.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {AVAILABLE_THEMES.map((theme, index) => {
+          const unlocked = isThemeUnlocked(theme.id, ownedThemeIds)
+          return (
+            <TouchableOpacity
+              key={theme.id}
+              style={[
+                styles.themeCard,
+                currentTheme.id === theme.id && styles.activeCard,
+                !unlocked && styles.lockedCard,
+              ]}
+              onPress={() => {
+                if (unlocked) onThemeSelect(index)
+                else universalNotify("Locked", "Buy this theme in the Shop.")
+              }}
+            >
+              <View style={styles.previewContainer}>
+                <Image source={theme.shape1} style={styles.miniShape} />
+                <Image source={theme.shape2} style={styles.miniShape} />
+              </View>
+              <Text style={styles.themeLabel}>{theme.label}</Text>
+              {!unlocked && (
+                <View style={styles.lockOverlay}>
+                  <FontAwesome name="lock" size={20} color="#FFFFF" />
+                </View>
+              )}
+            </TouchableOpacity>
+          )
+        })}
       </View>
     </ScrollView>
   </View>
@@ -207,4 +253,6 @@ const styles = StyleSheet.create({
   ruleItem: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#4dabf7' },
   ruleTitle: { fontSize: 16, fontWeight: 'bold', color: '#343a40', marginBottom: 5 },
   ruleDetail: { fontSize: 14, color: '#868e96', lineHeight: 20 },
+  lockedCard: { opacity: 0.6,},
+  lockOverlay: {position: 'absolute', top: 6, right: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center',},
 });

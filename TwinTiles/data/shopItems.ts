@@ -14,12 +14,38 @@ export interface ShopItem {
 
 export const SHOP_ITEMS: ShopItem[] = [
   {
-    id: "theme-mono",
+    id: "storm",
     category: "theme",
-    name: "Monochrome Theme",
-    description: "Clean black & white style",
-    price: 200,
-    iconName: "circle-o",
+    name: "Storm Set",
+    description: "Blue & Black on a stormy backdrop.",
+    price: 250,
+    iconName: "cloud",
+  },
+  {
+        id: "sunlit",
+    category: "theme",
+    name: "Sunlit Set",
+    description: "Warm yellow on muted grey.",
+    price: 250,
+    iconName: "sun-o",
+  },
+  {
+        id: "shadow",
+    category: "theme",
+    name: "Shadow Set",
+    description: "Sharp contrast for dark mode lovers.",
+    price: 300,
+    iconName: "mon-o",
+  },
+  {
+    id: "hints-pack-1",
+    category: "powerup",
+    name: "1 Hints",
+    description: "One hint, one chance.",
+    price: 12,
+    iconName: "lightbulb-o",
+    consumable: true,
+    effect: "extra-hints",
   },
   {
     id: "hints-pack-5",

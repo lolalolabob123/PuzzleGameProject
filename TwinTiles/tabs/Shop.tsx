@@ -9,6 +9,7 @@ import {
     Alert,
     Platform,
     Modal,
+    useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome, FontAwesome5 } from "@expo/vector-icons";
@@ -109,6 +110,23 @@ export default function Shop() {
         universalNotify("Coins added", `+${pack.amount} coins`)
     }
 
+    const {width: windowWidth} = useWindowDimensions()
+
+    const {columnCount, cardWidth} = useMemo(() => {
+        const horizontalPadding = spacing.lg * 2
+        const gap = spacing.md
+        const available = windowWidth - horizontalPadding
+
+        const cols =
+            available < 540 ? 2 :
+            available < 820 ? 3 :
+            4;
+        
+        const totalGap = gap * (cols - 1)
+        const card = Math.floor((available - totalGap) / cols)
+        return {columnCount: cols, cardWidth: card}
+    }, [windowWidth])
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -187,7 +205,7 @@ export default function Shop() {
                     return (
                         <View key={category} style={styles.section}>
                             <Text style={styles.sectionHeader}>{SECTION_TITLES[category]}</Text>
-                            <View style={styles.grid}>
+                            <View style={[styles.grid, {gap: spacing.md}]}>
                                 {items.map((item) => (
                                     <ItemCard
                                         key={item.id}
@@ -196,6 +214,7 @@ export default function Shop() {
                                         canAfford={coins >= item.price}
                                         onBuy={() => handleBuy(item)}
                                         uiTheme={uiTheme}
+                                        cardWidth={cardWidth}
                                     />
                                 ))}
                             </View>
@@ -213,6 +232,7 @@ type ItemCardProps = {
     canAfford: boolean;
     onBuy: () => void;
     uiTheme: UITheme;
+    cardWidth: number;
 };
 
 const ItemCard = ({ item, isOwned, canAfford, onBuy, uiTheme }: ItemCardProps) => {
@@ -319,7 +339,6 @@ const makeStyles = (uiTheme: UITheme) =>
             justifyContent: "space-between",
         },
         card: {
-            width: "48%",
             backgroundColor: uiTheme.surface,
             borderRadius: radii.md,
             padding: spacing.md,
@@ -333,8 +352,8 @@ const makeStyles = (uiTheme: UITheme) =>
             opacity: 0.7,
         },
         cardIconWrap: {
-            width: 64,
-            height: 64,
+            width: 80,
+            height: 80,
             borderRadius: radii.md,
             backgroundColor: uiTheme.surfaceMuted,
             justifyContent: "center",
