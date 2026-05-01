@@ -4,6 +4,8 @@ import { GameScreenProps } from "../navigation/types";
 import PuzzleBoard from "../components/PuzzleBoard";
 import { chapters } from "../data/chapters";
 import { useTheme } from '../context/ThemeContext';
+import { FontAwesome } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   spacing,
   radii,
@@ -47,7 +49,15 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <TouchableOpacity
+        style={styles.backFab}
+        onPress={() => navigation.goBack()}
+        activeOpacity={0.8}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <FontAwesome name='chevron-left' size={20} color={uiTheme.textPrimary} />
+      </TouchableOpacity>
+
       <PuzzleBoard
         key={`board-${chapterId}-${levelId}`}
         levelData={levelData}
@@ -57,7 +67,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
         onNextLevel={handleNextLevel}
         forcedReset={forcedReset}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -119,5 +129,20 @@ const makeStyles = (uiTheme: UITheme) =>
     backButtonText: {
       color: uiTheme.name === 'mono' ? uiTheme.surface : '#FFFFFF',
       fontWeight: 'bold',
+    },
+    backFab: {
+      position: 'absolute',
+      top: spacing.md,
+      left: spacing.md,
+      zIndex: 10,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: uiTheme.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      ...shadows.sm,
     },
   });

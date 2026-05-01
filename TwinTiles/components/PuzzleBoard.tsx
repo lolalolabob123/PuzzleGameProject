@@ -12,7 +12,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-
+import {
+  getFreeHintAvailable,
+  recordFreeHintUsed,
+  getNextReplenishMS,
+  HINT_REPLENISH_MS
+} from "../utils/hints"
 import {
   unlockNextLevel,
   saveLevelState,
@@ -84,8 +89,9 @@ export default function PuzzleBoard({
   const [isInitializing, setIsInitializing] = useState(true);
   const [winModalVisible, setWinModalVisible] = useState(false);
   const [history, setHistory] = useState<number[][]>([]);
-  const [hintsLeft, setHintsLeft] = useState(3);
+  const [freeHints, setFreeHints] = useState(0)
   const [extraHints, setExtraHints] = useState(0)
+  const [nextReplenishMs, setNextReplenishMs] = useState<number | null>(null)
   const [hintIndex, setHintIndex] = useState<number | null>(null);
   const [moveCount, setMoveCount] = useState(0);
 
@@ -98,6 +104,19 @@ export default function PuzzleBoard({
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
+
+  const refreshHintState = useCallback(async () => {
+    setFreeHints(await getFreeHintAvailable())
+    setExtraHints(await getEffectCount("extra-hints"))
+    setNextReplenishMs(await getNextReplenishMS())
+  }, [])
+
+  const formatCountdown = (ms: number): string => {
+    const total = Math.max(0, Math.ceil(ms / 1000))
+    const m = Math.floor(total / 60)
+    const s = total % 60
+    return m > 0 ? `${m}m ${s}s` : `${s}s`
+  } 
 
   const getValidationState = useCallback(
     (arr: number[]) => {
@@ -248,7 +267,7 @@ export default function PuzzleBoard({
       setIsInitializing(true);
       setWinModalVisible(false);
       setMoveCount(0);
-      setHintsLeft(3);
+      await refreshHintState()
       hasWonRef.current = false;
       starAnims.forEach((a) => a.setValue(0));
 
@@ -341,10 +360,16 @@ export default function PuzzleBoard({
     setCells(fresh);
     setHistory([]);
     setMoveCount(0);
-    setHintsLeft(3);
     setHintIndex(null);
     starAnims.forEach((a) => a.setValue(0));
     saveLevelState(chapterId, level, fresh);
+
+    useEffect(() => {
+      if (nextReplenishMs === null) return
+      const id = setInterval(refreshHintState, 15_000)
+      return () => clearInterval(id)
+    }, [nextReplenishMs, refreshHintState])
+
   };
 
   const cageInfo = useMemo(() => {
@@ -552,29 +577,33 @@ export default function PuzzleBoard({
         <TouchableOpacity
           style={[styles.actionButton, styles.hintButton]}
           onPress={async () => {
-            const totalAvailable = hintsLeft + extraHints
-            if (totalAvailable <= 0) return
+            if (freeHints + extraHints <= 0) return
 
-          const target = cells.findIndex((c) => c === 0)
-          if (target === -1) return
+            const target = cells.findIndex((c) => c === 0)
 
-          setHintIndex(target)
+            setHintIndex(target)
 
-          if (hintsLeft > 0) {
-            setHintsLeft((h) => h - 1)
-          } else {
-            setExtraHints((e) => e - 1)
-            await incrementEffect("extra-hints", -1)
-          }
-          Animated.sequence([
-            Animated.timing(hintPulse, {toValue: 1.3, duration: 300, useNativeDriver: true}),
-            Animated.timing(hintPulse, {toValue: 1.0, duration: 300, useNativeDriver: true}),
-          ]).start(() => setHintIndex(null))
+            if (freeHints > 0) {
+              await recordFreeHintUsed()
+            } else {
+              await incrementEffect("extra-hints", -1)
+            }
+            await refreshHintState()
+
+            Animated.sequence([
+              Animated.timing(hintPulse, {toValue: 1.3, duration: 300, useNativeDriver: true}),
+              Animated.timing(hintPulse, {toValue: 1.0, duration: 300, useNativeDriver: true}),
+            ]).start(() => setHintIndex(null))
           }}
         >
           <Text style={styles.hintButtonText}>
-            Hint {hintsLeft + extraHints}
+            Hint ({freeHints + extraHints})
           </Text>
+          {nextReplenishMs !== null && freeHints < 3 && (
+            <Text style={styles.hintCountdownText}>
+              +1 in {formatCountdown(nextReplenishMs)}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -942,4 +971,10 @@ const makeStyles = (uiTheme: UITheme) =>
       fontSize: 18,
       fontWeight: "bold",
     },
+    hintCountdownText: {
+  ...typography.micro,
+  color: uiTheme.name === 'mono' ? uiTheme.textPrimary : '#FFFFFF',
+  marginTop: 1,
+  opacity: 0.85,
+},
   });
