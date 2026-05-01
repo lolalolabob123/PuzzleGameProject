@@ -15,7 +15,7 @@ export const AVAILABLE_THEMES: GameTheme[] = [
   {
     id: 'classic',
     label: 'Classic',
-    palette: 'blue',
+    palette: 'classic',
     tileColor: '#FFFFFF',
     tileEdgeColor: '#D8E8F2',
     shape1Color: '#2572A8',   // ocean blue
@@ -24,7 +24,7 @@ export const AVAILABLE_THEMES: GameTheme[] = [
   {
     id: 'ink',
     label: 'Ink',
-    palette: 'mono',
+    palette: 'ink',
     tileColor: '#F8F6F1',     // warm cream
     tileEdgeColor: '#E5DFD3',
     shape1Color: '#1A1A1A',   // graphite
@@ -34,7 +34,7 @@ export const AVAILABLE_THEMES: GameTheme[] = [
   {
     id: 'storm',
     label: 'Storm',
-    palette: 'blue',
+    palette: 'storm',
     tileColor: '#1F2A3D',     // deep slate
     tileEdgeColor: '#101826',
     shape1Color: '#5DADE2',   // electric blue
@@ -43,7 +43,7 @@ export const AVAILABLE_THEMES: GameTheme[] = [
   {
     id: 'sunset',
     label: 'Sunset',
-    palette: 'blue',
+    palette: 'sunset',
     tileColor: '#FFF5EB',     // cream
     tileEdgeColor: '#F0DFC9',
     shape1Color: '#F76C5E',   // coral
@@ -52,7 +52,7 @@ export const AVAILABLE_THEMES: GameTheme[] = [
   {
     id: 'forest',
     label: 'Forest',
-    palette: 'blue',
+    palette: 'forest',
     tileColor: '#F4F0E6',     // bone
     tileEdgeColor: '#DDD5C2',
     shape1Color: '#2F7045',   // emerald
@@ -61,7 +61,7 @@ export const AVAILABLE_THEMES: GameTheme[] = [
   {
     id: 'neon',
     label: 'Neon',
-    palette: 'mono',
+    palette: 'neon',
     tileColor: '#1B1B1F',     // near-black
     tileEdgeColor: '#0A0A0D',
     shape1Color: '#FF3CAC',   // magenta

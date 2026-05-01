@@ -1,43 +1,50 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const KEY = "HINT_COOLDOWNS"
-const HINT_CAP = 3
-const COOLDOWN_MS = 10 * 60 * 1000
+// New economy: every player gets a one-time grant of 3 free hints when they
+// first launch the app. Once consumed, they're gone — additional hints are
+// purchased from the shop and tracked via the "extra-hints" effect counter
+// in utils/coins.ts. No timers, no replenishment.
 
-const getStored = async (): Promise<number[]> => {
-    try{
-        const raw = await AsyncStorage.getItem(KEY)
-        return raw ? JSON.parse(raw) : []
-    } catch {return []}
-}
+const FREE_HINTS_KEY = "FREE_HINTS_REMAINING";
+const FREE_HINTS_INITIAL = 3;
 
-const getActive = async (): Promise<number[]> => {
-    const all = await getStored()
-    const now = Date.now()
-    const active = all.filter(ts => now - ts < COOLDOWN_MS)
-    if (active.length !== all.length) {
-        await AsyncStorage.setItem(KEY, JSON.stringify(active))
-    }
-    return active
-}
+const isInitialised = async (): Promise<boolean> => {
+  const raw = await AsyncStorage.getItem(FREE_HINTS_KEY);
+  return raw !== null;
+};
 
-export const getFreeHintAvailable = async(): Promise<number> => {
-    const active = await getActive()
-    return Math.max(0, HINT_CAP - active.length)
-}
+const ensureInitialised = async (): Promise<number> => {
+  if (await isInitialised()) {
+    const raw = await AsyncStorage.getItem(FREE_HINTS_KEY);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  await AsyncStorage.setItem(FREE_HINTS_KEY, String(FREE_HINTS_INITIAL));
+  return FREE_HINTS_INITIAL;
+};
 
-export const recordFreeHintUsed = async (): Promise<void> => {
-    const active = await getActive()
-    if (active.length >= HINT_CAP) return
-    const updated = [...active, Date.now()]
-    await AsyncStorage.setItem(KEY, JSON.stringify(updated))
-}
+export const getFreeHintsRemaining = async (): Promise<number> => {
+  try {
+    return await ensureInitialised();
+  } catch {
+    return 0;
+  }
+};
 
-export const getNextReplenishMS = async (): Promise<number | null> => {
-    const active = await getActive()
-    if (active.length === 0) return null
-    const oldest = Math.min(...active)
-    return Math.min(0, oldest + COOLDOWN_MS - Date.now())
-}
+export const consumeFreeHint = async (): Promise<boolean> => {
+  const remaining = await ensureInitialised();
+  if (remaining <= 0) return false;
+  await AsyncStorage.setItem(FREE_HINTS_KEY, String(remaining - 1));
+  return true;
+};
 
-export const HINT_REPLENISH_MS = COOLDOWN_MS
+// Used by the "Wipe All Data" reset path so a fresh start re-grants the 3.
+export const resetFreeHints = async (): Promise<void> => {
+  await AsyncStorage.removeItem(FREE_HINTS_KEY);
+};
+
+// ─── Back-compat alias (older imports) ──────────────────────────────────────
+// Kept so callers that haven't migrated yet still compile. Prefer the new
+// names above in any new code.
+export const getFreeHintAvailable = getFreeHintsRemaining;
+export const recordFreeHintUsed = consumeFreeHint;

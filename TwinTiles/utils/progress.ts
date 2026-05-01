@@ -9,7 +9,14 @@ const KEYS = {
   PROGRESS: "GAME_PROGRESS",
   levelState: (chapter: number, level: number) => `level_state_${chapter}_${level}`,
   stars: (chapter: number, level: number) => `stars_${chapter}_${level}`,
-  prefixes: ["chapter_", "level_state_", "stars_", "GAME_PROGRESS"]
+  prefixes: [
+    "chapter_",
+    "level_state_",
+    "stars_",
+    "GAME_PROGRESS",
+    "FREE_HINTS_REMAINING",
+    "HINT_COOLDOWNS", // legacy key from the old timed hint system
+  ]
 }
 
 const wait = (ms: number) => new Promise(res => setTimeout(res, ms));

@@ -13,10 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import {
-  getFreeHintAvailable,
-  recordFreeHintUsed,
-  getNextReplenishMS,
-  HINT_REPLENISH_MS
+  getFreeHintsRemaining,
+  consumeFreeHint,
 } from "../utils/hints"
 import {
   unlockNextLevel,
@@ -92,7 +90,6 @@ export default function PuzzleBoard({
   const [history, setHistory] = useState<number[][]>([]);
   const [freeHints, setFreeHints] = useState(0)
   const [extraHints, setExtraHints] = useState(0)
-  const [nextReplenishMs, setNextReplenishMs] = useState<number | null>(null)
   const [hintIndex, setHintIndex] = useState<number | null>(null);
   const [moveCount, setMoveCount] = useState(0);
 
@@ -107,17 +104,9 @@ export default function PuzzleBoard({
   ]).current;
 
   const refreshHintState = useCallback(async () => {
-    setFreeHints(await getFreeHintAvailable())
+    setFreeHints(await getFreeHintsRemaining())
     setExtraHints(await getEffectCount("extra-hints"))
-    setNextReplenishMs(await getNextReplenishMS())
   }, [])
-
-  const formatCountdown = (ms: number): string => {
-    const total = Math.max(0, Math.ceil(ms / 1000))
-    const m = Math.floor(total / 60)
-    const s = total % 60
-    return m > 0 ? `${m}m ${s}s` : `${s}s`
-  }
 
   const getValidationState = useCallback(
     (arr: number[]) => {
@@ -371,13 +360,6 @@ export default function PuzzleBoard({
     setHintIndex(null);
     starAnims.forEach((a) => a.setValue(0));
     saveLevelState(chapterId, level, fresh);
-
-    useEffect(() => {
-      if (nextReplenishMs === null) return
-      const id = setInterval(refreshHintState, 15_000)
-      return () => clearInterval(id)
-    }, [nextReplenishMs, refreshHintState])
-
   };
 
   const cageInfo = useMemo(() => {
@@ -584,6 +566,7 @@ export default function PuzzleBoard({
 
         <TouchableOpacity
           style={[styles.actionButton, styles.hintButton]}
+          disabled={freeHints + extraHints <= 0}
           onPress={async () => {
             if (freeHints + extraHints <= 0) return
 
@@ -592,7 +575,7 @@ export default function PuzzleBoard({
             setHintIndex(target)
 
             if (freeHints > 0) {
-              await recordFreeHintUsed()
+              await consumeFreeHint()
             } else {
               await incrementEffect("extra-hints", -1)
             }
@@ -607,11 +590,6 @@ export default function PuzzleBoard({
           <Text style={styles.hintButtonText}>
             Hint ({freeHints + extraHints})
           </Text>
-          {nextReplenishMs !== null && freeHints < 3 && (
-            <Text style={styles.hintCountdownText}>
-              +1 in {formatCountdown(nextReplenishMs)}
-            </Text>
-          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -673,7 +651,7 @@ const Tile = ({
     );
   }
 
-  const cageBorderThickness = uiTheme.name === "mono" ? 4 : 3.5;
+  const cageBorderThickness = uiTheme.isDark ? 3 : 3.5;
 
   return (
     <TouchableOpacity
@@ -902,10 +880,9 @@ const makeStyles = (uiTheme: UITheme) =>
       left: 4,
       fontWeight: "800",
       color: uiTheme.textPrimary,
-      textShadowColor:
-        uiTheme.name === "mono"
-          ? "rgba(255,255,255,0.9)"
-          : "rgba(255,255,255,0.85)",
+      textShadowColor: uiTheme.isDark
+        ? "rgba(0,0,0,0.55)"
+        : "rgba(255,255,255,0.85)",
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 2,
     },
@@ -937,7 +914,8 @@ const makeStyles = (uiTheme: UITheme) =>
     },
     hintButtonText: {
       ...typography.caption,
-      color: uiTheme.name === "mono" ? uiTheme.textPrimary : "#FFFFFF",
+      // star is always yellow → use a dark text for contrast on every theme
+      color: '#1A1A1A',
     },
     modalOverlay: {
       flex: 1,
@@ -983,14 +961,8 @@ const makeStyles = (uiTheme: UITheme) =>
       ...shadows.sm,
     },
     nextButtonText: {
-      color: uiTheme.name === "mono" ? uiTheme.surface : "#FFFFFF",
+      color: uiTheme.onPrimary,
       fontSize: 18,
       fontWeight: "bold",
-    },
-    hintCountdownText: {
-      ...typography.micro,
-      color: uiTheme.name === 'mono' ? uiTheme.textPrimary : '#FFFFFF',
-      marginTop: 1,
-      opacity: 0.85,
     },
   });

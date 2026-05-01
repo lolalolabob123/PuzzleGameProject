@@ -83,7 +83,7 @@ export default function ProfileSetup({
                                 ]}
                                 activeOpacity={0.85}
                                 >
-                                    <FontAwesome  name={avatar.iconName as any} size={28} color="#FFFFF"/>
+                                    <FontAwesome  name={avatar.iconName as any} size={28} color="#FFFFFF"/>
                                 </TouchableOpacity>
                         )
                     })}
@@ -162,7 +162,7 @@ const makeStyles = (uiTheme: UITheme) =>
     },
     saveButtonText: {
       ...typography.title,
-      color: uiTheme.name === "mono" ? uiTheme.surface : "#FFFFFF",
+      color: uiTheme.onPrimary,
       fontSize: 17,
     },
     cancelButton: {

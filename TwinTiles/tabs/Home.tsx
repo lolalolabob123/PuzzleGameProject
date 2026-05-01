@@ -1,78 +1,107 @@
-import React, { useCallback, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Image, Alert, Platform, LogBox } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  Alert,
+  Platform,
+  LogBox,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
-import { CommonActions } from '@react-navigation/native';
-import { AVAILABLE_THEMES } from "../constants/themes";
+import { useFocusEffect } from "@react-navigation/native";
+
+import { AVAILABLE_THEMES, GameTheme } from "../constants/themes";
 import { useTheme } from "../context/ThemeContext";
 import { resetChapterProgress, clearAllGameData } from "../utils/progress";
 import { HomeScreenProps } from "../navigation/types";
-import { GameTheme } from "../constants/themes";
-import { useFocusEffect } from "@react-navigation/native";
 import { getOwnedItemIds } from "../utils/coins";
 import { SHOP_ITEMS } from "../data/shopItems";
-import {useProfile} from "../context/ProfileContext"
+import { useProfile } from "../context/ProfileContext";
 import { AVAILABLE_AVATARS } from "../data/avatars";
-import ProfileSetup from "../components/ProfileSetup"
+import ProfileSetup from "../components/ProfileSetup";
+import {
+  spacing,
+  radii,
+  typography,
+  shadows,
+  UITheme,
+} from "../constants/uiTheme";
 
-if (Platform.OS === 'web') {
+if (Platform.OS === "web") {
   const originalWarn = console.warn;
   console.warn = (...args) => {
-    if (args[0]?.toString().includes('shadow*')) return;
+    if (args[0]?.toString().includes("shadow*")) return;
     originalWarn(...args);
   };
 } else {
-  LogBox.ignoreLogs(['shadow*']);
+  LogBox.ignoreLogs(["shadow*"]);
 }
 
-const universalAlert = (title: string, message: string, onConfirm: () => void, isDestructive = false) => {
-  if (Platform.OS === 'web') {
+const universalAlert = (
+  title: string,
+  message: string,
+  onConfirm: () => void,
+  isDestructive = false
+) => {
+  if (Platform.OS === "web") {
     if (window.confirm(`${title}\n\n${message}`)) onConfirm();
   } else {
     Alert.alert(title, message, [
       { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: isDestructive ? "destructive" : "default", onPress: onConfirm }
+      {
+        text: "Confirm",
+        style: isDestructive ? "destructive" : "default",
+        onPress: onConfirm,
+      },
     ]);
   }
 };
 
 const universalNotify = (title: string, message: string) => {
-  Platform.OS === 'web' ? window.alert(message) : Alert.alert(title, message);
+  Platform.OS === "web" ? window.alert(message) : Alert.alert(title, message);
 };
 
 const PAID_THEME_IDS = new Set(
-  SHOP_ITEMS.filter(i => i.category === "theme").map(i => i.id)
-)
+  SHOP_ITEMS.filter((i) => i.category === "theme").map((i) => i.id)
+);
 
 const isThemeUnlocked = (themeId: string, owned: string[]) => {
-  if (!PAID_THEME_IDS.has(themeId)) return true
-  return owned.includes(themeId)
-}
+  if (!PAID_THEME_IDS.has(themeId)) return true;
+  return owned.includes(themeId);
+};
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
+  const { themeIndex, setTheme, ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const currentTheme = AVAILABLE_THEMES[themeIndex];
+
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [infoVisible, setInfoVisible] = useState(false)
-  const { themeIndex, setTheme } = useTheme();
-  const currentTheme = AVAILABLE_THEMES[themeIndex];
-  const [ownedThemeIds, setOwnedThemeIds] = useState<string[]>([])
-  const {profile} = useProfile()
-  const useAvatar = AVAILABLE_AVATARS.find(a => a.id === profile?.avatarId) ?? AVAILABLE_AVATARS[0]
-  const [editProfileVisible, setEditProfileVisisble] = useState(false)
+  const [infoVisible, setInfoVisible] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [ownedThemeIds, setOwnedThemeIds] = useState<string[]>([]);
+
+  const { profile } = useProfile();
+  const selectedAvatar =
+    AVAILABLE_AVATARS.find((a) => a.id === profile?.avatarId) ??
+    AVAILABLE_AVATARS[0];
 
   const handleResetChapter = () => {
     universalAlert(
       "Reset Progress",
       "Are you sure you want to reset Chapter 1?",
       async () => {
-        // 1. Clear the actual data
         await resetChapterProgress(1);
         setProfileMenuVisible(false);
         setTimeout(() => {
           navigation.navigate("LevelModal", {
             chapterId: 1,
             themeIndex: themeIndex,
-            refreshKey: Date.now().toString()
+            refreshKey: Date.now().toString(),
           });
           universalNotify("Success", "Progress reset.");
         }, 150);
@@ -92,112 +121,273 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       },
       true
     );
-  };  
+  };
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const owned = await getOwnedItemIds()
-        if (!cancelled) setOwnedThemeIds(owned)
+        const owned = await getOwnedItemIds();
+        if (!cancelled) setOwnedThemeIds(owned);
       })();
-      return () => { cancelled = true }
+      return () => {
+        cancelled = true;
+      };
     }, [])
-  )
-
-  const renderProfileMenu = () => (
-    <Modal visible={profileMenuVisible} transparent animationType="fade">
-      <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
-        <View style={styles.profileMenu}>
-          <MenuOption icon="user" label="Edit Profile" onPress={() => {
-            setProfileMenuVisible(false)
-            setEditProfileVisisble(true)
-          }}/>
-          <Modal visible={editProfileVisible} animationType="slide" presentationStyle="pageSheet">
-            <ProfileSetup
-              initialName={profile?.name}
-              initialAvatarId={profile?.avatarId}
-              onComplete={() => setEditProfileVisisble(false)}/>
-          </Modal>
-          <View style={styles.menuDivider}/>
-          <MenuOption icon="cog" label="Settings" onPress={() => { setProfileMenuVisible(false); setSettingsVisible(true); }} />
-          <View style={styles.menuDivider} />
-          <MenuOption icon="refresh" label="Reset Chapter 1" color="#f08c00" onPress={handleResetChapter} />
-          <View style={styles.menuDivider} />
-          <MenuOption icon="trash" label="Clear All Data" color="#ff6b6b" onPress={handleFullReset} />
-        </View>
-      </TouchableOpacity>
-    </Modal>
   );
 
+  const profileGreeting = profile?.name?.trim()
+    ? `Hi, ${profile.name.trim()}`
+    : "Welcome back";
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <View style={styles.topNav}>
-        <TouchableOpacity onPress={() => setInfoVisible(true)}>
-          <FontAwesome name="info-circle" size={30} color="black" />
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => setInfoVisible(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <FontAwesome
+            name="info-circle"
+            size={22}
+            color={uiTheme.textPrimary}
+          />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setProfileMenuVisible(true)}>
-          <View style={[styles.headerAvatar, {backgroundColor: useAvatar.color}]}>
-            <FontAwesome name={useAvatar.iconName as any} size={20} color="#FFFFF"/>
+        <Text style={styles.appTitle}>TwinTiles</Text>
+
+        <TouchableOpacity
+          onPress={() => setProfileMenuVisible(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <View
+            style={[
+              styles.headerAvatar,
+              { backgroundColor: selectedAvatar.color },
+            ]}
+          >
+            <FontAwesome
+              name={selectedAvatar.iconName as any}
+              size={20}
+              color="#FFFFFF"
+            />
           </View>
         </TouchableOpacity>
       </View>
-      <View style={styles.rankContainer}>
-        <Text style={styles.rankText}>Rank</Text>
+
+      <View style={styles.heroBlock}>
+        <Text style={styles.heroEyebrow}>{profileGreeting}</Text>
+        <Text style={styles.heroTitle}>Ready for a puzzle?</Text>
+        <Text style={styles.heroSubtitle}>
+          Pick up where you left off, or jump into a new chapter.
+        </Text>
       </View>
 
-      {renderProfileMenu()}
+      <View style={styles.ctaRow}>
+        <TouchableOpacity
+          style={[styles.ctaCard, styles.ctaCardPrimary]}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate("Chapters", { themeIndex })}
+        >
+          <FontAwesome name="play" size={18} color={uiTheme.onPrimary} />
+          <Text style={[styles.ctaCardTitle, { color: uiTheme.onPrimary }]}>
+            Continue
+          </Text>
+          <Text
+            style={[
+              styles.ctaCardSubtitle,
+              { color: uiTheme.onPrimary, opacity: 0.85 },
+            ]}
+          >
+            Jump back into chapters
+          </Text>
+        </TouchableOpacity>
 
-      <Modal visible={infoVisible} animationType="slide" presentationStyle="pageSheet">
+        <TouchableOpacity
+          style={styles.ctaCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate("Shop")}
+        >
+          <FontAwesome name="shopping-bag" size={18} color={uiTheme.primary} />
+          <Text style={styles.ctaCardTitle}>Shop</Text>
+          <Text style={styles.ctaCardSubtitle}>Themes & power-ups</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.rankContainer}>
+        <Text style={styles.rankEyebrow}>Your rank</Text>
+        <Text style={styles.rankText}>—</Text>
+        <Text style={styles.rankCaption}>
+          Earn stars to climb the leaderboard
+        </Text>
+      </View>
+
+      {/* ── Profile dropdown menu ─────────────────────────────────────── */}
+      <Modal
+        visible={profileMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setProfileMenuVisible(false)}
+        >
+          <View style={styles.profileMenu}>
+            <MenuOption
+              icon="user"
+              label="Edit Profile"
+              uiTheme={uiTheme}
+              onPress={() => {
+                setProfileMenuVisible(false);
+                // Wait for the dropdown to dismiss before opening the
+                // page-sheet so iOS doesn't drop the second presentation.
+                setTimeout(() => setEditProfileVisible(true), 250);
+              }}
+            />
+            <View style={styles.menuDivider} />
+            <MenuOption
+              icon="cog"
+              label="Settings"
+              uiTheme={uiTheme}
+              onPress={() => {
+                setProfileMenuVisible(false);
+                setSettingsVisible(true);
+              }}
+            />
+            <View style={styles.menuDivider} />
+            <MenuOption
+              icon="refresh"
+              label="Reset Chapter 1"
+              color={uiTheme.warning}
+              uiTheme={uiTheme}
+              onPress={handleResetChapter}
+            />
+            <View style={styles.menuDivider} />
+            <MenuOption
+              icon="trash"
+              label="Clear All Data"
+              color={uiTheme.danger}
+              uiTheme={uiTheme}
+              onPress={handleFullReset}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Edit Profile sheet (sibling of menu modal, NOT nested) ───── */}
+      <Modal
+        visible={editProfileVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditProfileVisible(false)}
+      >
+        <ProfileSetup
+          initialName={profile?.name}
+          initialAvatarId={profile?.avatarId}
+          onComplete={() => setEditProfileVisible(false)}
+          isEditing
+        />
+      </Modal>
+
+      {/* ── How to play ──────────────────────────────────────────────── */}
+      <Modal
+        visible={infoVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setInfoVisible(false)}
+      >
         <HowToPlay onClose={() => setInfoVisible(false)} />
       </Modal>
 
-      <Modal visible={settingsVisible} animationType="slide" presentationStyle="pageSheet">
+      {/* ── Settings (theme picker) ──────────────────────────────────── */}
+      <Modal
+        visible={settingsVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSettingsVisible(false)}
+      >
         <SettingsContent
           currentTheme={currentTheme}
           onThemeSelect={setTheme}
           onClose={() => setSettingsVisible(false)}
-          ownedThemeIds={ownedThemeIds} />
+          ownedThemeIds={ownedThemeIds}
+        />
       </Modal>
     </SafeAreaView>
   );
 }
 
-const HowToPlay = ({ onClose }: { onClose: () => void }) => (
-  <View style={styles.settingsPage}>
-    <View style={styles.settingsHeader}>
-      <Text style={styles.settingsTitle}>How to Play</Text>
-      <TouchableOpacity onPress={onClose}><Text style={styles.doneButton}>Close</Text></TouchableOpacity>
+const HowToPlay = ({ onClose }: { onClose: () => void }) => {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  return (
+    <View style={styles.settingsPage}>
+      <View style={styles.settingsHeader}>
+        <Text style={styles.settingsTitle}>How to Play</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Text style={styles.doneButton}>Close</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Rule
+          title="1. Equal Distribution"
+          detail="Each row and column must contain an equal number of both symbols."
+        />
+        <Rule
+          title="2. No Three-in-a-Row"
+          detail="There cannot be more than two of the same color directly next to each other, horizontally or vertically."
+        />
+        <Rule
+          title="3. Unique Rows/Cols"
+          detail="No two rows or columns can be identical (for larger puzzles)."
+        />
+        <Rule
+          title="4. Move Limit"
+          detail="Solve the puzzle in as few moves as possible to earn 3 stars!"
+        />
+      </ScrollView>
     </View>
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <Rule title="1. Equal Distribution" detail="Each row and column must contain an equal number of both symbols." />
-      <Rule title="2. No Three-in-a-Row" detail="There cannot be more than two of the same color directly next to each other, horizontally or vertically." />
-      <Rule title="3. Unique Rows/Cols" detail="No two rows or columns can be identical (for larger puzzles)." />
-      <Rule title="4. Move Limit" detail="Solve the puzzle in as few moves as possible to earn 3 stars!" />
-    </ScrollView>
-  </View>
-);
+  );
+};
 
-const Rule = ({ title, detail }: { title: string, detail: string }) => (
-  <View style={styles.ruleItem}>
-    <Text style={styles.ruleTitle}>{title}</Text>
-    <Text style={styles.ruleDetail}>{detail}</Text>
-  </View>
-);
+const Rule = ({ title, detail }: { title: string; detail: string }) => {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  return (
+    <View style={styles.ruleItem}>
+      <Text style={styles.ruleTitle}>{title}</Text>
+      <Text style={styles.ruleDetail}>{detail}</Text>
+    </View>
+  );
+};
 
 type MenuOptionProps = {
   icon: React.ComponentProps<typeof FontAwesome>["name"];
   label: string;
   onPress: () => void;
   color?: string;
+  uiTheme: UITheme;
 };
-const MenuOption = ({ icon, label, onPress, color = "#444" }: MenuOptionProps) => (
-  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-    <FontAwesome name={icon} size={18} color={color} />
-    <Text style={[styles.menuText, { color }]}>{label}</Text>
-  </TouchableOpacity>
-);
+
+const MenuOption = ({
+  icon,
+  label,
+  onPress,
+  color,
+  uiTheme,
+}: MenuOptionProps) => {
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const tone = color ?? uiTheme.textPrimary;
+  return (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+      <FontAwesome name={icon} size={18} color={tone} />
+      <Text style={[styles.menuText, { color: tone }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
 
 type SettingsContentProps = {
   currentTheme: GameTheme;
@@ -206,85 +396,319 @@ type SettingsContentProps = {
   ownedThemeIds: string[];
 };
 
-const SettingsContent = ({ currentTheme, onThemeSelect, onClose, ownedThemeIds }: SettingsContentProps) => (
-  <View style={styles.settingsPage}>
-    <View style={styles.settingsHeader}>
-      <Text style={styles.settingsTitle}>Settings</Text>
-      <TouchableOpacity onPress={onClose}><Text style={styles.doneButton}>Done</Text></TouchableOpacity>
-    </View>
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
-      <View style={styles.themeGrid}>
-        {AVAILABLE_THEMES.map((theme, index) => {
-          const unlocked = isThemeUnlocked(theme.id, ownedThemeIds)
-          return (
-            <TouchableOpacity
-              key={theme.id}
-              style={[
-                styles.themeCard,
-                currentTheme.id === theme.id && styles.activeCard,
-                !unlocked && styles.lockedCard,
-              ]}
-              onPress={() => {
-                if (unlocked) onThemeSelect(index)
-                else universalNotify("Locked", "Buy this theme in the Shop.")
-              }}
-            >
-              <View
+const SettingsContent = ({
+  currentTheme,
+  onThemeSelect,
+  onClose,
+  ownedThemeIds,
+}: SettingsContentProps) => {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  return (
+    <View style={styles.settingsPage}>
+      <View style={styles.settingsHeader}>
+        <Text style={styles.settingsTitle}>Settings</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Text style={styles.doneButton}>Done</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
+        <View style={styles.themeGrid}>
+          {AVAILABLE_THEMES.map((theme, index) => {
+            const unlocked = isThemeUnlocked(theme.id, ownedThemeIds);
+            const isActive = currentTheme.id === theme.id;
+            return (
+              <TouchableOpacity
+                key={theme.id}
                 style={[
-                  styles.previewContainer,
-                  {
-                    backgroundColor: theme.tileColor,
-                    borderColor: theme.tileEdgeColor,
-                  },
+                  styles.themeCard,
+                  isActive && styles.activeCard,
+                  !unlocked && styles.lockedCard,
                 ]}
+                onPress={() => {
+                  if (unlocked) onThemeSelect(index);
+                  else
+                    universalNotify(
+                      "Locked",
+                      "Buy this theme in the Shop."
+                    );
+                }}
               >
                 <View
-                  style={[styles.miniShape, { backgroundColor: theme.shape1Color }]}
-                />
-                <View
-                  style={[styles.miniShape, { backgroundColor: theme.shape2Color }]}
-                />
-              </View>
-              <Text style={styles.themeLabel}>{theme.label}</Text>
-              {!unlocked && (
-                <View style={styles.lockOverlay}>
-                  <FontAwesome name="lock" size={20} color="#FFFFF" />
+                  style={[
+                    styles.previewContainer,
+                    {
+                      backgroundColor: theme.tileColor,
+                      borderColor: theme.tileEdgeColor,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.miniShape,
+                      { backgroundColor: theme.shape1Color },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.miniShape,
+                      { backgroundColor: theme.shape2Color },
+                    ]}
+                  />
                 </View>
-              )}
-            </TouchableOpacity>
-          )
-        })}
-      </View>
-    </ScrollView>
-  </View>
-);
+                <Text style={styles.themeLabel}>{theme.label}</Text>
+                {!unlocked && (
+                  <View style={styles.lockOverlay}>
+                    <FontAwesome name="lock" size={20} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  topNav: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 25, paddingVertical: 15 },
-  rankContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  rankText: { fontSize: 24, fontWeight: "bold" },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-start', alignItems: 'flex-end' },
-  profileMenu: { marginTop: 60, marginRight: 20, backgroundColor: 'white', borderRadius: 15, padding: 10, width: 180, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10 },
-  menuText: { marginLeft: 12, fontSize: 16, fontWeight: '500' },
-  menuDivider: { height: 1, backgroundColor: '#eee' },
-  settingsPage: { flex: 1, backgroundColor: '#f8f9fa', padding: 20 },
-  settingsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  settingsTitle: { fontSize: 28, fontWeight: 'bold' },
-  doneButton: { fontSize: 18, color: '#4dabf7', fontWeight: '600' },
-  sectionSubHeader: { fontSize: 13, fontWeight: 'bold', color: '#adb5bd', textTransform: 'uppercase', marginBottom: 15 },
-  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  themeCard: { width: '48%', backgroundColor: 'white', borderRadius: 16, padding: 15, marginBottom: 15, alignItems: 'center', borderWidth: 2, borderColor: '#e9ecef' },
-  activeCard: { borderColor: '#4dabf7', backgroundColor: '#e7f5ff' },
-  previewContainer: { flexDirection: 'row', marginBottom: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, gap: 8 },
-  miniShape: { width: 26, height: 26, borderRadius: 13},
-  themeLabel: { fontSize: 14, fontWeight: '600', color: '#495057' },
-  ruleItem: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#4dabf7' },
-  ruleTitle: { fontSize: 16, fontWeight: 'bold', color: '#343a40', marginBottom: 5 },
-  ruleDetail: { fontSize: 14, color: '#868e96', lineHeight: 20 },
-  lockedCard: { opacity: 0.6, },
-  lockOverlay: { position: 'absolute', top: 6, right: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', },
-  headerAvatar: {width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center'}
-});
+const makeStyles = (uiTheme: UITheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: uiTheme.background },
+    topNav: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.md,
+    },
+    iconButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: uiTheme.surface,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      justifyContent: "center",
+      alignItems: "center",
+      ...shadows.sm,
+    },
+    appTitle: {
+      ...typography.title,
+      color: uiTheme.textPrimary,
+      letterSpacing: 0.5,
+    },
+    headerAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: uiTheme.surface,
+      ...shadows.sm,
+    },
+    heroBlock: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+    },
+    heroEyebrow: {
+      ...typography.micro,
+      color: uiTheme.textMuted,
+      textTransform: "uppercase",
+      marginBottom: spacing.xs,
+    },
+    heroTitle: {
+      ...typography.display,
+      color: uiTheme.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    heroSubtitle: {
+      ...typography.body,
+      color: uiTheme.textMuted,
+    },
+    ctaRow: {
+      flexDirection: "row",
+      paddingHorizontal: spacing.xl,
+      marginTop: spacing.xl,
+      gap: spacing.md,
+    },
+    ctaCard: {
+      flex: 1,
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.lg,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      ...shadows.sm,
+    },
+    ctaCardPrimary: {
+      backgroundColor: uiTheme.primary,
+      borderColor: uiTheme.primary,
+    },
+    ctaCardTitle: {
+      ...typography.title,
+      fontSize: 18,
+      color: uiTheme.textPrimary,
+      marginTop: spacing.md,
+    },
+    ctaCardSubtitle: {
+      ...typography.caption,
+      color: uiTheme.textMuted,
+      marginTop: 2,
+    },
+    rankContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.xl,
+    },
+    rankEyebrow: {
+      ...typography.micro,
+      color: uiTheme.textMuted,
+      textTransform: "uppercase",
+      marginBottom: spacing.sm,
+    },
+    rankText: {
+      fontSize: 56,
+      fontWeight: "900",
+      color: uiTheme.textPrimary,
+      letterSpacing: 1,
+    },
+    rankCaption: {
+      ...typography.caption,
+      color: uiTheme.textMuted,
+      marginTop: spacing.sm,
+      textAlign: "center",
+    },
+
+    // Profile dropdown
+    menuOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.25)",
+      justifyContent: "flex-start",
+      alignItems: "flex-end",
+    },
+    profileMenu: {
+      marginTop: 70,
+      marginRight: spacing.xl,
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.xs,
+      width: 200,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      ...shadows.md,
+    },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+    },
+    menuText: {
+      marginLeft: spacing.md,
+      fontSize: 15,
+      fontWeight: "600",
+    },
+    menuDivider: {
+      height: 1,
+      backgroundColor: uiTheme.border,
+      marginHorizontal: spacing.sm,
+    },
+
+    // Settings / How to play sheets
+    settingsPage: {
+      flex: 1,
+      backgroundColor: uiTheme.background,
+      padding: spacing.xl,
+    },
+    settingsHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.xl,
+    },
+    settingsTitle: {
+      ...typography.display,
+      color: uiTheme.textPrimary,
+    },
+    doneButton: {
+      ...typography.body,
+      color: uiTheme.primary,
+      fontWeight: "700",
+    },
+    sectionSubHeader: {
+      ...typography.micro,
+      color: uiTheme.textMuted,
+      textTransform: "uppercase",
+      marginBottom: spacing.md,
+    },
+    themeGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+    },
+    themeCard: {
+      width: "48%",
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: uiTheme.border,
+    },
+    activeCard: {
+      borderColor: uiTheme.primary,
+      backgroundColor: uiTheme.primarySoft,
+    },
+    previewContainer: {
+      flexDirection: "row",
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+      borderWidth: 1.5,
+      gap: spacing.sm,
+    },
+    miniShape: { width: 26, height: 26, borderRadius: 13 },
+    themeLabel: {
+      ...typography.caption,
+      color: uiTheme.textPrimary,
+    },
+    ruleItem: {
+      backgroundColor: uiTheme.surface,
+      padding: spacing.md,
+      borderRadius: radii.md,
+      marginBottom: spacing.md,
+      borderLeftWidth: 4,
+      borderLeftColor: uiTheme.primary,
+    },
+    ruleTitle: {
+      ...typography.title,
+      fontSize: 16,
+      color: uiTheme.textPrimary,
+      marginBottom: 4,
+    },
+    ruleDetail: {
+      ...typography.body,
+      fontSize: 14,
+      color: uiTheme.textMuted,
+      lineHeight: 20,
+    },
+    lockedCard: { opacity: 0.6 },
+    lockOverlay: {
+      position: "absolute",
+      top: 6,
+      right: 6,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+  });

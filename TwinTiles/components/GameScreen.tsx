@@ -127,7 +127,7 @@ const makeStyles = (uiTheme: UITheme) =>
       ...shadows.sm,
     },
     backButtonText: {
-      color: uiTheme.name === 'mono' ? uiTheme.surface : '#FFFFFF',
+      color: uiTheme.onPrimary,
       fontWeight: 'bold',
     },
     backFab: {
