@@ -21,11 +21,12 @@ import {
   saveLevelState,
   getLevelState,
   saveLevelStars,
+  getLevelStars,
 } from "../utils/progress";
 import { useTheme } from "../context/ThemeContext";
 import { Level } from "../data/chapters";
 import { colorCages } from "../utils/levelGenerator";
-import { getEffectCount, incrementEffect } from "../utils/coins"
+import { addCoins, getEffectCount, incrementEffect } from "../utils/coins"
 import { checkAndGrantAchievements } from "../utils/achievements";
 import {
   spacing,
@@ -80,7 +81,6 @@ export default function PuzzleBoard({
 
   const handleContainerLayout = (e: LayoutChangeEvent) => {
     const { width, height, x, y } = e.nativeEvent.layout;
-    console.log("CONTAINER LAYOUT:", { width, height, x, y });
     if (width > 0) setContainerWidth(width);
   };
 
@@ -92,6 +92,8 @@ export default function PuzzleBoard({
   const [extraHints, setExtraHints] = useState(0)
   const [hintIndex, setHintIndex] = useState<number | null>(null);
   const [moveCount, setMoveCount] = useState(0);
+  const [winStars, setWinStars] = useState(0)
+  const [winPreviousStars, setWinPreviousStars] = useState(0)
 
   const hasWonRef = useRef(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -215,8 +217,17 @@ export default function PuzzleBoard({
     if (moveCount <= emptyCount * multiplier) stars = 3;
     else if (moveCount <= emptyCount * (multiplier + 0.5)) stars = 2;
 
+    const previousStars = await getLevelStars(chapterId, level)
+    const COIN_PER_STAR = 5
+    await saveLevelStars(chapterId, level, stars)
+    if (stars > previousStars) {
+      await addCoins((stars - previousStars) * COIN_PER_STAR)
+    }
     await saveLevelStars(chapterId, level, stars);
     await unlockNextLevel(chapterId, level);
+
+    setWinStars(stars)
+    setWinPreviousStars(previousStars)
 
     const newlyEarned = await checkAndGrantAchievements()
     if (newlyEarned.length > 0) {
@@ -426,7 +437,9 @@ export default function PuzzleBoard({
     <SafeAreaView style={styles.container}>
       <WinModal
         visible={winModalVisible}
-        stars={starAnims}
+        starAnims={starAnims}
+        starCount={winStars}
+        previousStars={winPreviousStars}
         moves={moveCount}
         onNext={onNextLevel}
       />
@@ -519,7 +532,6 @@ export default function PuzzleBoard({
 
               <View
                 style={[styles.board, { width: boardSize, height: boardSize }]}
-                onLayout={(e) => console.log("BOARD LAYOUT:", e.nativeEvent.layout)}
               >
                 {cells.map((val, i) => (
                   <Tile
@@ -766,12 +778,14 @@ const Tile = ({
 
 type WinModalProps = {
   visible: boolean;
-  stars: Animated.Value[];
+  starAnims: Animated.Value[];
+  starCount: number
+  previousStars: number;
   moves: number;
   onNext: () => void;
 };
 
-const WinModal = ({ visible, stars, moves, onNext }: WinModalProps) => {
+const WinModal = ({ visible, starAnims, moves, onNext, starCount, previousStars }: WinModalProps) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
@@ -781,7 +795,7 @@ const WinModal = ({ visible, stars, moves, onNext }: WinModalProps) => {
         <View style={styles.modalContent}>
           <Text style={styles.winTitle}>Cleared!</Text>
           <View style={styles.starRow}>
-            {stars.map((anim: any, i: number) => (
+            {starAnims.map((anim: any, i: number) => (
               <Animated.Text
                 key={i}
                 style={[
@@ -793,6 +807,15 @@ const WinModal = ({ visible, stars, moves, onNext }: WinModalProps) => {
               </Animated.Text>
             ))}
           </View>
+          {starCount > previousStars && (
+            <Text style={styles.improvementText}>
+              {previousStars === 0 ? 'New Solve!' : `Up from ${previousStars} ★`}
+            </Text>
+          ) || (
+            <Text style={styles.improvementText}>
+              `Best: {previousStars} ★`
+            </Text>
+          )}
           <Text style={styles.statsText}>{moves} moves taken</Text>
           <TouchableOpacity style={styles.nextButton} onPress={onNext}>
             <Text style={styles.nextButtonText}>Next Level</Text>
@@ -964,5 +987,10 @@ const makeStyles = (uiTheme: UITheme) =>
       color: uiTheme.onPrimary,
       fontSize: 18,
       fontWeight: "bold",
+    },
+    improvementText: {
+      ...typography.caption,
+      color: uiTheme.success,
+      marginBottom: spacing.sm,
     },
   });
