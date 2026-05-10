@@ -28,6 +28,7 @@ import { Level } from "../data/chapters";
 import { colorCages } from "../utils/levelGenerator";
 import { addCoins, getEffectCount, incrementEffect } from "../utils/coins"
 import { checkAndGrantAchievements } from "../utils/achievements";
+import ConfettiCanon from "react-native-confetti-cannon"
 import {
   spacing,
   radii,
@@ -202,8 +203,8 @@ export default function PuzzleBoard({
 
     if (currentVal === 0) setMoveCount((m) => m + 1);
     setHistory((h) => [...h, [...cells]].slice(-20));
-    setCells(newCells);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCells(newCells); 
+    lightImpact();
     playSound("tilePlace")
     saveLevelState(chapterId, level, newCells);
   };
@@ -238,7 +239,7 @@ export default function PuzzleBoard({
       Platform.OS === "web" ? window.alert(list) : Alert.alert("Achievement unlocked!", list)
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    successHaptic();
     setWinModalVisible(true);
     playSound("win")
 
@@ -254,7 +255,7 @@ export default function PuzzleBoard({
   };
 
   const triggerShake = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    errorHaptic();
     Animated.sequence([
       Animated.timing(shakeAnim, {
         toValue: 10,
@@ -792,12 +793,31 @@ type WinModalProps = {
 };
 
 const WinModal = ({ visible, starAnims, moves, onNext, starCount, previousStars }: WinModalProps) => {
-  const { ui: uiTheme } = useTheme();
+  const { ui: uiTheme, theme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const [confettiReady, setConfettiReady] = useState(false)
+
+  useEffect(() => {
+    if (visible && starCount >= 2) {
+      const t = setTimeout(() => setConfettiReady(true), 200)
+      return () => clearTimeout(t)
+    }
+    setConfettiReady(false)
+  }, [visible, starCount])
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
+        {confettiReady && (
+          <ConfettiCanon
+          count={120}
+          origin={{x: -20, y: 0}}
+          fadeOut
+          autoStart
+          explosionSpeed={350}
+          fallSpeed={2800}
+          colors={[theme.shape1Color, theme.shape2Color, uiTheme.star]}/>
+        )}
         <View style={styles.modalContent}>
           <Text style={styles.winTitle}>Cleared!</Text>
           <View style={styles.starRow}>
