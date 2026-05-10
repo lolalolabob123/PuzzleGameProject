@@ -15,7 +15,9 @@ const KEYS = {
     "stars_",
     "GAME_PROGRESS",
     "FREE_HINTS_REMAINING",
-    "HINT_COOLDOWNS", // legacy key from the old timed hint system
+    "HINT_COOLDOWNS",
+    "STREAK_LAST_LOGIN",
+    "STREAK_COUNT",
   ]
 }
 
