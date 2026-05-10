@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   LogBox,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
@@ -23,6 +24,8 @@ import { SHOP_ITEMS } from "../data/shopItems";
 import { useProfile } from "../context/ProfileContext";
 import { AVAILABLE_AVATARS } from "../data/avatars";
 import ProfileSetup from "../components/ProfileSetup";
+import { isAudioEnabled, setAudioEnabled } from "../utils/audio";
+import { isHapticsEnabled, setHapticsEnabled } from "../utils/haptics";
 import {
   spacing,
   radii,
@@ -404,6 +407,19 @@ const SettingsContent = ({
 }: SettingsContentProps) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const [audioOn, setAudioOn] = useState(isAudioEnabled())
+  const [hapticsOn, setHaticsOn] = useState(isHapticsEnabled())
+
+  const handleToggleAudio = async (value: boolean) => {
+    setAudioOn(value)
+    await setAudioEnabled(value)
+  }
+
+  const handleToggleHaptics = async (value: boolean) => {
+    setHaticsOn(value)
+    await setHapticsEnabled(value)
+  }
+
   return (
     <View style={styles.settingsPage}>
       <View style={styles.settingsHeader}>
@@ -413,6 +429,34 @@ const SettingsContent = ({
         </TouchableOpacity>
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionSubHeader}>Feedback</Text>
+        <View style={styles.toggleCard}>
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Sound effects</Text>
+              <Text style={styles.toggleHint}>Tile taps, wins, hints</Text>
+            </View>
+            <Switch
+              value={audioOn}
+              onValueChange={handleToggleAudio}
+              trackColor={{ false: uiTheme.surfaceMuted, true: uiTheme.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <View style={styles.toggleDivider} />
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Vibrations</Text>
+              <Text style={styles.toggleHint}>Haptic feedback on taps</Text>
+            </View>
+            <Switch
+              value={hapticsOn}
+              onValueChange={handleToggleHaptics}
+              trackColor={{ false: uiTheme.surfaceMuted, true: uiTheme.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
         <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
         <View style={styles.themeGrid}>
           {AVAILABLE_THEMES.map((theme, index) => {
@@ -711,4 +755,32 @@ const makeStyles = (uiTheme: UITheme) =>
       justifyContent: "center",
       alignItems: "center",
     },
+    toggleCard: {
+  backgroundColor: uiTheme.surface,
+  borderRadius: radii.md,
+  borderWidth: 1,
+  borderColor: uiTheme.border,
+  marginBottom: spacing.xl,
+  ...shadows.sm,
+},
+toggleRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.md,
+},
+toggleDivider: {
+  height: 1,
+  backgroundColor: uiTheme.border,
+  marginHorizontal: spacing.md,
+},
+toggleLabel: {
+  ...typography.body,
+  color: uiTheme.textPrimary,
+},
+toggleHint: {
+  ...typography.micro,
+  color: uiTheme.textMuted,
+  marginTop: 2,
+},
   });

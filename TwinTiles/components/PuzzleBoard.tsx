@@ -36,6 +36,7 @@ import {
   UITheme,
 } from "../constants/uiTheme";
 import { playSound } from "../utils/audio";
+import {lightImpact, successHaptic, errorHaptic} from "../utils/haptics"
 
 interface PuzzleBoardProps {
   size: number;

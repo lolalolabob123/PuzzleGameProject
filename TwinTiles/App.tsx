@@ -15,6 +15,7 @@ import ProfileGate from "./components/ProfileGate"
 import Achievements from "./tabs/Achievements";
 import { useEffect } from "react";
 import {initAudio} from "./utils/audio"
+import { initHaptics } from "./utils/haptics";
 
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -54,6 +55,7 @@ function Tabs() {
 export default function App() {
   useEffect(() => {
     initAudio()
+    initHaptics()
   }, [])
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
