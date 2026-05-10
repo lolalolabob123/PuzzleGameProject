@@ -35,6 +35,7 @@ import {
   shadows,
   UITheme,
 } from "../constants/uiTheme";
+import { playSound } from "../utils/audio";
 
 interface PuzzleBoardProps {
   size: number;
@@ -202,6 +203,7 @@ export default function PuzzleBoard({
     setHistory((h) => [...h, [...cells]].slice(-20));
     setCells(newCells);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playSound("tilePlace")
     saveLevelState(chapterId, level, newCells);
   };
 
@@ -237,6 +239,7 @@ export default function PuzzleBoard({
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setWinModalVisible(true);
+    playSound("win")
 
     starAnims.slice(0, stars).forEach((a, i) => {
       Animated.spring(a, {
@@ -570,6 +573,7 @@ export default function PuzzleBoard({
               const last = history[history.length - 1];
               setCells(last);
               setHistory((h) => h.slice(0, -1));
+              playSound("hint")
             }
           }}
         >
@@ -585,6 +589,7 @@ export default function PuzzleBoard({
             const target = cells.findIndex((c) => c === 0)
 
             setHintIndex(target)
+            playSound("hint")
 
             if (freeHints > 0) {
               await consumeFreeHint()

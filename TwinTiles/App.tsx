@@ -13,6 +13,8 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { ProfileProvider } from "./context/ProfileContext";
 import ProfileGate from "./components/ProfileGate"
 import Achievements from "./tabs/Achievements";
+import { useEffect } from "react";
+import {initAudio} from "./utils/audio"
 
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -50,6 +52,9 @@ function Tabs() {
   );
 }
 export default function App() {
+  useEffect(() => {
+    initAudio()
+  }, [])
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>

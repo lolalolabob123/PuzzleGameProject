@@ -3,6 +3,8 @@ import {Modal, View, Text, TouchableOpacity, StyleSheet} from "react-native"
 import {FontAwesome, FontAwesome5} from "@expo/vector-icons"
 import { useTheme } from "../context/ThemeContext"
 import {spacing, radii, typography, shadows, UITheme} from "../constants/uiTheme"
+import { useEffect } from "react"
+import { playSound } from "../utils/audio"
 
 type Props = {
     streak: number;
@@ -13,6 +15,10 @@ type Props = {
 export default function StreakModal({streak, reward, onClose}: Props) {
     const {ui: uiTheme} = useTheme()
     const styles = useMemo(() => makeStyles(uiTheme), [uiTheme])
+
+    useEffect(() => {
+        playSound("streak")
+    }, [])
 
     return (
         <Modal visible transparent animationType="fade" onRequestClose={onClose}>
