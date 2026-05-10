@@ -6,9 +6,9 @@ type SoundName = "tilePlace" | "win" | "hint" | "undo" | "streak"
 const sources: Record<SoundName, number> = {
     tilePlace: require("../assets/audio/pluck_002.ogg"),
     win: require("../assets/audio/confirmation_004.ogg"),
-    hint: require("../assets/aduio/glass_001.ogg"),
+    hint: require("../assets/audio/glass_001.ogg"),
     undo: require("../assets/audio/back_001.ogg"),
-    streak: require("../assets/audio/bong-001.ogg"),
+    streak: require("../assets/audio/bong_001.ogg"),
 }
 
 const cache: Partial<Record<SoundName, Audio.Sound>> = {}
