@@ -228,19 +228,20 @@ export default function PuzzleBoard({
       const alreadySolved = await hasSolvedToday()
       if (!alreadySolved) {
         await markDailySolved()
-      } else {
-        previousStars = await getLevelStars(chapterId, level)
-        const COIN_PER_STAR = 5
-        if (stars > previousStars) {
-          await addCoins((stars - previousStars) * COIN_PER_STAR)
-        }
-        await saveLevelStars(chapterId, level, stars)
-        await unlockNextLevel(chapterId, level)
       }
-
-      setWinStars(stars)
-      setWinPreviousStars(previousStars)
+      // no chapter writes in daily mode
+    } else {
+      previousStars = await getLevelStars(chapterId, level)
+      const COIN_PER_STAR = 5
+      if (stars > previousStars) {
+        await addCoins((stars - previousStars) * COIN_PER_STAR)
+      }
+      await saveLevelStars(chapterId, level, stars)
+      await unlockNextLevel(chapterId, level)
     }
+
+    setWinStars(stars)
+    setWinPreviousStars(previousStars)
 
     const newlyEarned = await checkAndGrantAchievements()
     if (newlyEarned.length > 0) {
