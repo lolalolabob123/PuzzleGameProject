@@ -19,7 +19,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#D9D9D9"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.lolalolabob.TwinTiles"
     },
     "web": {
       "favicon": "./assets/favicon.png"
