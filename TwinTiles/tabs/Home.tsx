@@ -306,7 +306,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         />
       </Modal>
 
-      {/* ── How to play ──────────────────────────────────────────────── */}
+      {/*How to Play*/}
       <Modal
         visible={infoVisible}
         animationType="slide"
@@ -316,7 +316,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <HowToPlay onClose={() => setInfoVisible(false)} />
       </Modal>
 
-      {/* ── Settings (theme picker) ──────────────────────────────────── */}
+      {/*Settings*/}
       <Modal
         visible={settingsVisible}
         animationType="slide"

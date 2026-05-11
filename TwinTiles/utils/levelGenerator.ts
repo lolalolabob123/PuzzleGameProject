@@ -204,8 +204,6 @@ const generateCages = (size: number, rng: any): number[][] => {
   return groups;
 };
 
-// Binairo uniqueness check that also respects cage sum constraints.
-// Short-circuits at `limit` solutions (default 2 — we only care about "is it unique").
 const countSolutionsCaged = (
   grid: number[],
   size: number,

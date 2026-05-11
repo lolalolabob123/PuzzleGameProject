@@ -18,7 +18,6 @@ export default function Achievements() {
   const [statuses, setStatuses] = useState<Status[]>([]);
 
   const refresh = useCallback(async () => {
-    // Detect any pending achievements (e.g. earned via shop actions).
     await checkAndGrantAchievements();
     setStatuses(await getAchievementStatus());
   }, []);

@@ -26,7 +26,6 @@ export const addCoins = async (delta: number): Promise<number> => {
   return next;
 };
 
-// Returns true if the spend succeeded; false if not enough coins.
 export const spendCoins = async (cost: number): Promise<boolean> => {
   const current = await getCoins();
   if (current < cost) return false;

@@ -155,7 +155,7 @@ export default function Shop() {
                     <TouchableOpacity
                         style={styles.modalContent}
                         activeOpacity={1}
-                        onPress={() => { }}  // swallow taps so they don't close the modal
+                        onPress={() => { }}
                     >
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Get Coins</Text>

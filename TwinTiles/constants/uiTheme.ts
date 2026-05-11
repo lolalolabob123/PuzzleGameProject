@@ -50,7 +50,7 @@ export type UITheme = {
   warning: string;
 };
 
-// ─── Classic (cool blue, light) ─────────────────────────────────────────────
+//Classic
 const classic: UITheme = {
   name: 'classic',
   isDark: false,
@@ -91,7 +91,7 @@ const classic: UITheme = {
   ...accents,
 };
 
-// ─── Ink (warm grayscale, light) ────────────────────────────────────────────
+//Ink
 const ink: UITheme = {
   name: 'ink',
   isDark: false,
@@ -132,7 +132,7 @@ const ink: UITheme = {
   ...accents,
 };
 
-// ─── Storm (electric blue on deep slate, dark) ──────────────────────────────
+//Storm
 const storm: UITheme = {
   name: 'storm',
   isDark: true,
@@ -171,11 +171,10 @@ const storm: UITheme = {
     4: '#F0F4FA',
   },
   ...accents,
-  // softer danger so it doesn't burn against dark background
   danger: '#FF6B6B',
 };
 
-// ─── Sunset (warm coral + saffron, light) ───────────────────────────────────
+//Sunset
 const sunset: UITheme = {
   name: 'sunset',
   isDark: false,
@@ -216,7 +215,7 @@ const sunset: UITheme = {
   ...accents,
 };
 
-// ─── Forest (emerald + earth, light) ────────────────────────────────────────
+//Forest
 const forest: UITheme = {
   name: 'forest',
   isDark: false,
@@ -257,7 +256,7 @@ const forest: UITheme = {
   ...accents,
 };
 
-// ─── Neon (magenta + cyan on near-black, dark) ──────────────────────────────
+//Neon
 const neon: UITheme = {
   name: 'neon',
   isDark: true,

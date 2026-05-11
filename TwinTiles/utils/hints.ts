@@ -38,13 +38,9 @@ export const consumeFreeHint = async (): Promise<boolean> => {
   return true;
 };
 
-// Used by the "Wipe All Data" reset path so a fresh start re-grants the 3.
 export const resetFreeHints = async (): Promise<void> => {
   await AsyncStorage.removeItem(FREE_HINTS_KEY);
 };
 
-// ─── Back-compat alias (older imports) ──────────────────────────────────────
-// Kept so callers that haven't migrated yet still compile. Prefer the new
-// names above in any new code.
 export const getFreeHintAvailable = getFreeHintsRemaining;
 export const recordFreeHintUsed = consumeFreeHint;

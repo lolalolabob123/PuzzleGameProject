@@ -62,21 +62,18 @@ export default function PuzzleBoard({
   const { theme, ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
-  // Measure actual available width from layout instead of guessing from Dimensions
   const [containerWidth, setContainerWidth] = useState(0);
 
   const { cellSize, boardSize } = useMemo(() => {
     if (containerWidth === 0) return { cellSize: 0, boardSize: 0 };
-    const PADDING = spacing.lg * 2; // paddingHorizontal applies to both sides
-    const BOARD_BORDER = 2; // styles.board has borderWidth: 1 on each side
+    const PADDING = spacing.lg * 2;
+    const BOARD_BORDER = 2;
     const maxWidth = containerWidth - INDICATOR_WIDTH - PADDING;
     const finalCellSize = Math.max(
       30,
       Math.floor((maxWidth - BOARD_BORDER) / size)
     );
-    // Board's outer width must include the border so the inner content area
-    // is exactly cellSize * size — otherwise the last column wraps and gets
-    // clipped by overflow:hidden.
+
     return {
       cellSize: finalCellSize,
       boardSize: finalCellSize * size + BOARD_BORDER,
@@ -229,7 +226,6 @@ export default function PuzzleBoard({
       if (!alreadySolved) {
         await markDailySolved()
       }
-      // no chapter writes in daily mode
     } else {
       previousStars = await getLevelStars(chapterId, level)
       const COIN_PER_STAR = 5
