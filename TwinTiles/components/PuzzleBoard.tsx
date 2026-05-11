@@ -227,7 +227,7 @@ export default function PuzzleBoard({
     if (daily) {
       const alreadySolved = await hasSolvedToday()
       if (!alreadySolved) {
-        await markDailySolved
+        await markDailySolved()
       } else {
         previousStars = await getLevelStars(chapterId, level)
         const COIN_PER_STAR = 5
