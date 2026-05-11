@@ -26,6 +26,8 @@ import { AVAILABLE_AVATARS } from "../data/avatars";
 import ProfileSetup from "../components/ProfileSetup";
 import { isAudioEnabled, setAudioEnabled } from "../utils/audio";
 import { isHapticsEnabled, setHapticsEnabled } from "../utils/haptics";
+import DailyCard from "../components/DailyCard";
+import { todayKey } from "../utils/daily"
 import {
   spacing,
   radii,
@@ -186,7 +188,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           Pick up where you left off, or jump into a new chapter.
         </Text>
       </View>
-
+      <DailyCard
+        onPlay={() =>
+          navigation.navigate("Game", {
+            levelId: 0,
+            chapterId: 0,
+            themeIndex,
+            daily: true,
+          })
+        }
+      />
       <View style={styles.ctaRow}>
         <TouchableOpacity
           style={[styles.ctaCard, styles.ctaCardPrimary]}
@@ -756,31 +767,31 @@ const makeStyles = (uiTheme: UITheme) =>
       alignItems: "center",
     },
     toggleCard: {
-  backgroundColor: uiTheme.surface,
-  borderRadius: radii.md,
-  borderWidth: 1,
-  borderColor: uiTheme.border,
-  marginBottom: spacing.xl,
-  ...shadows.sm,
-},
-toggleRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.md,
-},
-toggleDivider: {
-  height: 1,
-  backgroundColor: uiTheme.border,
-  marginHorizontal: spacing.md,
-},
-toggleLabel: {
-  ...typography.body,
-  color: uiTheme.textPrimary,
-},
-toggleHint: {
-  ...typography.micro,
-  color: uiTheme.textMuted,
-  marginTop: 2,
-},
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      marginBottom: spacing.xl,
+      ...shadows.sm,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    toggleDivider: {
+      height: 1,
+      backgroundColor: uiTheme.border,
+      marginHorizontal: spacing.md,
+    },
+    toggleLabel: {
+      ...typography.body,
+      color: uiTheme.textPrimary,
+    },
+    toggleHint: {
+      ...typography.micro,
+      color: uiTheme.textMuted,
+      marginTop: 2,
+    },
   });

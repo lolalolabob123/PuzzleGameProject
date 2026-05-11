@@ -18,6 +18,8 @@ const KEYS = {
     "HINT_COOLDOWNS",
     "STREAK_LAST_LOGIN",
     "STREAK_COUNT",
+    "DAILY_LAST_SOLVED",
+    "DAILY_TOTAL_SOLVED",
   ]
 }
 

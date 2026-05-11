@@ -405,3 +405,42 @@ export const colorCages = (
   }
   return assigned
 }
+
+export const getDailyLevel = (
+  dateStr: string,
+  size: number = 6,
+  difficulty: number = 0.55,
+) : {grid: number[]; size: number} => {
+  const seed = `daily-${dateStr}`
+  const rng = seedrandom(seed)
+
+  const fullGrid = new Array(size * size).fill(0)
+
+  if (!fillGrid(fullGrid, 0, size, rng)) {
+    console.error(`Daily puzzle generation failed for ${dateStr}`)
+    return {grid: new Array(size * size).fill(0), size}
+  }
+
+  const puzzle = [...fullGrid]
+
+  const positions = Array.from({length: size * size}, (_, i) => i)
+  for (let i = positions.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [positions[i], positions[j]] = [positions[j], positions[i]]
+  }
+
+  const targetRemove = Math.floor(positions.length * difficulty)
+  let removedCount = 0
+
+  for (const pos of positions) {
+    if (removedCount >= targetRemove) break
+    const backup = puzzle[pos]
+    puzzle[pos] = 0
+    if (countSolutions([...puzzle], 0, size) !== 1) {
+      puzzle[pos] = backup
+    } else {
+      removedCount++
+    }
+  }
+  return {grid: puzzle, size}
+}

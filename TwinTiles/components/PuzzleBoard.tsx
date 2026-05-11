@@ -10,8 +10,6 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 import {
   getFreeHintsRemaining,
   consumeFreeHint,
@@ -37,7 +35,8 @@ import {
   UITheme,
 } from "../constants/uiTheme";
 import { playSound } from "../utils/audio";
-import {lightImpact, successHaptic, errorHaptic} from "../utils/haptics"
+import { lightImpact, successHaptic, errorHaptic } from "../utils/haptics"
+import { hasSolvedToday, markDailySolved } from "../utils/daily";
 
 interface PuzzleBoardProps {
   size: number;
@@ -46,6 +45,7 @@ interface PuzzleBoardProps {
   level: number;
   onNextLevel: () => void;
   forcedReset?: boolean;
+  daily?: boolean;
 }
 
 export default function PuzzleBoard({
@@ -55,6 +55,7 @@ export default function PuzzleBoard({
   level,
   onNextLevel,
   forcedReset = false,
+  daily = false,
 }: PuzzleBoardProps) {
   const INDICATOR_WIDTH = 45;
   const gridData = levelData?.grid || [];
@@ -203,7 +204,7 @@ export default function PuzzleBoard({
 
     if (currentVal === 0) setMoveCount((m) => m + 1);
     setHistory((h) => [...h, [...cells]].slice(-20));
-    setCells(newCells); 
+    setCells(newCells);
     lightImpact();
     playSound("tilePlace")
     saveLevelState(chapterId, level, newCells);
@@ -221,17 +222,25 @@ export default function PuzzleBoard({
     if (moveCount <= emptyCount * multiplier) stars = 3;
     else if (moveCount <= emptyCount * (multiplier + 0.5)) stars = 2;
 
-    const previousStars = await getLevelStars(chapterId, level)
-    const COIN_PER_STAR = 5
-    await saveLevelStars(chapterId, level, stars)
-    if (stars > previousStars) {
-      await addCoins((stars - previousStars) * COIN_PER_STAR)
-    }
-    await saveLevelStars(chapterId, level, stars);
-    await unlockNextLevel(chapterId, level);
+    let previousStars = 0
 
-    setWinStars(stars)
-    setWinPreviousStars(previousStars)
+    if (daily) {
+      const alreadySolved = await hasSolvedToday()
+      if (!alreadySolved) {
+        await markDailySolved
+      } else {
+        previousStars = await getLevelStars(chapterId, level)
+        const COIN_PER_STAR = 5
+        if (stars > previousStars) {
+          await addCoins((stars - previousStars) * COIN_PER_STAR)
+        }
+        await saveLevelStars(chapterId, level, stars)
+        await unlockNextLevel(chapterId, level)
+      }
+
+      setWinStars(stars)
+      setWinPreviousStars(previousStars)
+    }
 
     const newlyEarned = await checkAndGrantAchievements()
     if (newlyEarned.length > 0) {
@@ -439,7 +448,7 @@ export default function PuzzleBoard({
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <WinModal
         visible={winModalVisible}
         starAnims={starAnims}
@@ -611,7 +620,7 @@ export default function PuzzleBoard({
           </Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -687,7 +696,10 @@ const Tile = ({
             {
               backgroundColor: theme.tileColor,
               borderRadius: radii.sm,
-              borderWidth: 1.5,
+              borderTopWidth: cageEdges?.top ? 0 : 1.5,
+              borderBottomWidth: cageEdges?.bottom ? 0 : 1.5,
+              borderLeftWidth: cageEdges?.left ? 0 : 1.5,
+              borderRightWidth: cageEdges?.right ? 0 : 1.5,
               borderColor: theme.tileEdgeColor,
               opacity: isFixed ? 0.65 : 1,
             },
@@ -705,12 +717,6 @@ const Tile = ({
             />
           )}
 
-          {val !== 0 && chapterId === 4 && (
-            <Text style={[styles.tileValueOverlay, { fontSize: size * 0.3 }]}>
-              {val}
-            </Text>
-          )}
-
           {linkedColor && !isFixed && (
             <View
               style={[
@@ -723,6 +729,14 @@ const Tile = ({
                 },
               ]}
             />
+          )}
+
+          {val !== 0 && chapterId === 4 && (
+            <Text style={[
+              styles.tileValueOverlay, { fontSize: size * 0.3 }
+            ]}>
+              {val}
+            </Text>
           )}
 
           {cageEdges && (
@@ -810,13 +824,13 @@ const WinModal = ({ visible, starAnims, moves, onNext, starCount, previousStars 
       <View style={styles.modalOverlay}>
         {confettiReady && (
           <ConfettiCanon
-          count={120}
-          origin={{x: -20, y: 0}}
-          fadeOut
-          autoStart
-          explosionSpeed={350}
-          fallSpeed={2800}
-          colors={[theme.shape1Color, theme.shape2Color, uiTheme.star]}/>
+            count={120}
+            origin={{ x: -20, y: 0 }}
+            fadeOut
+            autoStart
+            explosionSpeed={350}
+            fallSpeed={2800}
+            colors={[theme.shape1Color, theme.shape2Color, uiTheme.star]} />
         )}
         <View style={styles.modalContent}>
           <Text style={styles.winTitle}>Cleared!</Text>
@@ -833,15 +847,15 @@ const WinModal = ({ visible, starAnims, moves, onNext, starCount, previousStars 
               </Animated.Text>
             ))}
           </View>
-          {starCount > previousStars && (
+          {starCount > previousStars ? (
             <Text style={styles.improvementText}>
               {previousStars === 0 ? 'New Solve!' : `Up from ${previousStars} ★`}
             </Text>
-          ) || (
-            <Text style={styles.improvementText}>
-              `Best: {previousStars} ★`
-            </Text>
-          )}
+          ) : (
+              <Text style={styles.improvementText}>
+                Best: {previousStars} ★
+              </Text>
+            )}
           <Text style={styles.statsText}>{moves} moves taken</Text>
           <TouchableOpacity style={styles.nextButton} onPress={onNext}>
             <Text style={styles.nextButtonText}>Next Level</Text>

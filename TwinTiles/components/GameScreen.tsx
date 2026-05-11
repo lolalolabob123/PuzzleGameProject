@@ -13,19 +13,30 @@ import {
   shadows,
   UITheme,
 } from "../constants/uiTheme";
+import { getDailyLevel } from '../utils/levelGenerator';
+import { todayKey } from '../utils/daily';
 
 export default function GameScreen({ route, navigation }: GameScreenProps) {
-  const { levelId, chapterId, forcedReset, themeIndex } = route.params;
+  const { levelId, chapterId, forcedReset, themeIndex, daily } = route.params;
 
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const levelData = useMemo(() => {
+    if (daily) {
+      const {grid, size} = getDailyLevel(todayKey())
+      return {id: 0, size, grid}
+    }
     const chapter = chapters[chapterId];
     return chapter?.levels.find((l) => l.id === levelId);
-  }, [chapterId, levelId]);
+  }, [chapterId, levelId, daily]);
 
   const handleNextLevel = () => {
+    if (daily) {
+      navigation.goBack()
+      return
+    }
+
     const currentChapter = chapters[chapterId];
     if (!currentChapter) return;
 
@@ -49,7 +60,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <TouchableOpacity
         style={styles.backFab}
         onPress={() => navigation.goBack()}
@@ -59,13 +70,14 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
       </TouchableOpacity>
 
       <PuzzleBoard
-        key={`board-${chapterId}-${levelId}`}
+        key={`board-${chapterId}-${levelId}-${daily ? "daily" : "normal"}`}
         levelData={levelData}
         chapterId={chapterId}
         level={levelId}
         size={levelData.size}
         onNextLevel={handleNextLevel}
         forcedReset={forcedReset}
+        daily={daily}
       />
     </SafeAreaView>
   );

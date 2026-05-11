@@ -16,12 +16,13 @@ export type RootStackParamList = {
     chapterId: number;
     levelId: number;
     themeIndex: number;
-    forcedReset?: boolean; // Fixed the missing property
+    forcedReset?: boolean;
+    daily?: boolean;
   };
   LevelModal: {
     chapterId: number;
     themeIndex: number;
-    refreshKey?: string; // Used to force re-mounting
+    refreshKey?: string;
   };
 };
 
