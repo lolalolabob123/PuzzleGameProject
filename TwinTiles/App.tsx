@@ -14,21 +14,24 @@ import { ProfileProvider } from "./context/ProfileContext";
 import ProfileGate from "./components/ProfileGate"
 import Achievements from "./tabs/Achievements";
 import { useEffect } from "react";
-import {initAudio} from "./utils/audio"
+import { initAudio } from "./utils/audio"
 import { initHaptics } from "./utils/haptics";
+import { useTheme } from "./context/ThemeContext";
 
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 function Tabs() {
+
+  const { ui: uiTheme } = useTheme()
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof FontAwesome.glyphMap = "circle";
-
           if (route.name === "Home") {
             iconName = "home";
           } else if (route.name === "Chapters") {
@@ -38,56 +41,57 @@ function Tabs() {
           } else if (route.name === "Shop") {
             iconName = "shopping-bag";
           }
-
           return <FontAwesome name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#4dabf7",
-        tabBarInactiveTintColor: "gray",
+        tabBarActiveTintColor: uiTheme.primary,
+        tabBarInactiveTintColor: uiTheme.textMuted,
+        tabBarStyle: {
+          backgroundColor: uiTheme.surface,
+          borderTopColor: uiTheme.border,
+          borderTopWidth: 1,
+        },
+        tabBarLabelStyle: {
+          fontWeight: "600",
+        }
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Chapters" component={ChapterSelect} />
-      <Tab.Screen name="Achievements" component={Achievements}/>
-      <Tab.Screen name="Shop" component={Shop}/>
+      <Tab.Screen name="Achievements" component={Achievements} />
+      <Tab.Screen name="Shop" component={Shop} />
     </Tab.Navigator>
   );
 }
+
+function MainNavigator() {
+  const { ui: uiTheme } = useTheme()
+  return (
+    <NavigationContainer>
+      <RootStack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: uiTheme.surface },
+          headerTintColor: uiTheme.textPrimary,
+          headerTitleStyle: { fontWeight: "700" },
+        }}
+      >
+        <RootStack.Screen name="Main" component={Tabs} options={{ headerShown: false }} />
+        <RootStack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
+        <RootStack.Group screenOptions={{ presentation: "modal" }}>
+          <RootStack.Screen name="LevelModal" component={LevelModalScreen} options={{ title: "Select a Level" }} />
+        </RootStack.Group>
+      </RootStack.Navigator>
+    </NavigationContainer>
+  )
+}
+
 export default function App() {
-  useEffect(() => {
-    initAudio()
-    initHaptics()
-  }, [])
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <ProfileProvider>
-        <ProfileGate>
-        <NavigationContainer>
-          <RootStack.Navigator>
-            <RootStack.Group>
-              <RootStack.Screen
-                name="Main"
-                component={Tabs}
-                options={{ headerShown: false }}
-              />
-            </RootStack.Group>
-
-            <RootStack.Screen
-              name="Game"
-              component={GameScreen}
-              options={{ title: "Puzzle", headerShown: false }}
-            />
-
-            <RootStack.Group screenOptions={{ presentation: 'modal' }}>
-              <RootStack.Screen
-                name="LevelModal"
-                component={LevelModalScreen}
-                options={{ title: 'Select a Level' }}
-              />
-            </RootStack.Group>
-          </RootStack.Navigator>
-        </NavigationContainer>
-        </ProfileGate>
+          <ProfileGate>
+            <MainNavigator />
+          </ProfileGate>
         </ProfileProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

@@ -84,7 +84,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
   const currentTheme = AVAILABLE_THEMES[themeIndex];
 
-  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [infoVisible, setInfoVisible] = useState(false);
   const [editProfileVisible, setEditProfileVisible] = useState(false);
@@ -101,7 +100,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       "Are you sure you want to reset Chapter 1?",
       async () => {
         await resetChapterProgress(1);
-        setProfileMenuVisible(false);
+        setSettingsVisible(false);
         setTimeout(() => {
           navigation.navigate("LevelModal", {
             chapterId: 1,
@@ -121,7 +120,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       "This will delete ALL progress.",
       async () => {
         await clearAllGameData();
-        setProfileMenuVisible(false);
+        setSettingsVisible(false);
         universalNotify("Deleted", "Data cleared.");
       },
       true
@@ -163,7 +162,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <Text style={styles.appTitle}>TwinTiles</Text>
 
         <TouchableOpacity
-          onPress={() => setProfileMenuVisible(true)}
+          onPress={() => setSettingsVisible(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View
@@ -237,60 +236,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </Text>
       </View>
 
-      {/* ── Profile dropdown menu ─────────────────────────────────────── */}
-      <Modal
-        visible={profileMenuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setProfileMenuVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.menuOverlay}
-          activeOpacity={1}
-          onPress={() => setProfileMenuVisible(false)}
-        >
-          <View style={styles.profileMenu}>
-            <MenuOption
-              icon="user"
-              label="Edit Profile"
-              uiTheme={uiTheme}
-              onPress={() => {
-                setProfileMenuVisible(false);
-                // Wait for the dropdown to dismiss before opening the
-                // page-sheet so iOS doesn't drop the second presentation.
-                setTimeout(() => setEditProfileVisible(true), 250);
-              }}
-            />
-            <View style={styles.menuDivider} />
-            <MenuOption
-              icon="cog"
-              label="Settings"
-              uiTheme={uiTheme}
-              onPress={() => {
-                setProfileMenuVisible(false);
-                setSettingsVisible(true);
-              }}
-            />
-            <View style={styles.menuDivider} />
-            <MenuOption
-              icon="refresh"
-              label="Reset Chapter 1"
-              color={uiTheme.warning}
-              uiTheme={uiTheme}
-              onPress={handleResetChapter}
-            />
-            <View style={styles.menuDivider} />
-            <MenuOption
-              icon="trash"
-              label="Clear All Data"
-              color={uiTheme.danger}
-              uiTheme={uiTheme}
-              onPress={handleFullReset}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* ── Edit Profile sheet (sibling of menu modal, NOT nested) ───── */}
       <Modal
         visible={editProfileVisible}
@@ -328,6 +273,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           onThemeSelect={setTheme}
           onClose={() => setSettingsVisible(false)}
           ownedThemeIds={ownedThemeIds}
+          profile={profile}
+          selectedAvatar={selectedAvatar}
+          onEditProfile={() => {
+            setSettingsVisible(false)
+            setTimeout(() => setEditProfileVisible(true), 250)
+          }}
+          onResetChapter={handleResetChapter}
+          onFullReset={handleFullReset}
         />
       </Modal>
     </SafeAreaView>
@@ -408,6 +361,11 @@ type SettingsContentProps = {
   onThemeSelect: (index: number) => void;
   onClose: () => void;
   ownedThemeIds: string[];
+  profile: ReturnType<typeof useProfile>["profile"];
+  selectedAvatar: typeof AVAILABLE_AVATARS[number];
+  onEditProfile: () => void;
+  onResetChapter: () => void;
+  onFullReset: () => void;
 };
 
 const SettingsContent = ({
@@ -415,6 +373,11 @@ const SettingsContent = ({
   onThemeSelect,
   onClose,
   ownedThemeIds,
+  profile,
+  selectedAvatar,
+  onEditProfile,
+  onResetChapter,
+  onFullReset,
 }: SettingsContentProps) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
@@ -440,87 +403,44 @@ const SettingsContent = ({
         </TouchableOpacity>
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
+        <TouchableOpacity
+        style={styles.profileRow}
+        onPress={onEditProfile}
+        activeOpacity={0.85}
+        >
+          <View style={[styles.profileAvatar, {backgroundColor: selectedAvatar.color}]}>
+            <FontAwesome name={selectedAvatar.iconName as any} size={22} color="#FFFFF"/>
+          </View>
+          <View style={{flex: 1, marginLeft: spacing.md}}>
+            <Text style={styles.profileName}>{profile?.name ?? "Player"}</Text>
+            <Text style={styles.profileHint}>Edit Profile</Text>
+          </View>
+          <FontAwesome name="chevron-right" size={16} color={uiTheme.textMuted}/>
+        </TouchableOpacity>
+
         <Text style={styles.sectionSubHeader}>Feedback</Text>
         <View style={styles.toggleCard}>
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toggleLabel}>Sound effects</Text>
-              <Text style={styles.toggleHint}>Tile taps, wins, hints</Text>
-            </View>
-            <Switch
-              value={audioOn}
-              onValueChange={handleToggleAudio}
-              trackColor={{ false: uiTheme.surfaceMuted, true: uiTheme.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          <View style={styles.toggleDivider} />
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toggleLabel}>Vibrations</Text>
-              <Text style={styles.toggleHint}>Haptic feedback on taps</Text>
-            </View>
-            <Switch
-              value={hapticsOn}
-              onValueChange={handleToggleHaptics}
-              trackColor={{ false: uiTheme.surfaceMuted, true: uiTheme.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
+
         </View>
+
         <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
-        <View style={styles.themeGrid}>
-          {AVAILABLE_THEMES.map((theme, index) => {
-            const unlocked = isThemeUnlocked(theme.id, ownedThemeIds);
-            const isActive = currentTheme.id === theme.id;
-            return (
-              <TouchableOpacity
-                key={theme.id}
-                style={[
-                  styles.themeCard,
-                  isActive && styles.activeCard,
-                  !unlocked && styles.lockedCard,
-                ]}
-                onPress={() => {
-                  if (unlocked) onThemeSelect(index);
-                  else
-                    universalNotify(
-                      "Locked",
-                      "Buy this theme in the Shop."
-                    );
-                }}
-              >
-                <View
-                  style={[
-                    styles.previewContainer,
-                    {
-                      backgroundColor: theme.tileColor,
-                      borderColor: theme.tileEdgeColor,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.miniShape,
-                      { backgroundColor: theme.shape1Color },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.miniShape,
-                      { backgroundColor: theme.shape2Color },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.themeLabel}>{theme.label}</Text>
-                {!unlocked && (
-                  <View style={styles.lockOverlay}>
-                    <FontAwesome name="lock" size={20} color="#FFFFFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.themeGrid}></View>
+
+        <View style={styles.sectionSubHeader}>Data</View>
+        <View style={styles.toggleCard}>
+          <TouchableOpacity style={styles.dangerRow} onPress={onResetChapter}>
+            <FontAwesome name="refresh" size={18}/>
+            <Text style={[styles.dangerLabel, {color: uiTheme.warning}]}>
+              Reset Chapter 1
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.toggleDivider}/>
+          <TouchableOpacity style={styles.dangerRow} onPress={onFullReset}>
+            <FontAwesome name="trash" size={18} color={uiTheme.danger}/>
+            <Text style={[styles.dangerLabel, {color: uiTheme.danger}]}>
+              Clear All Data
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -794,4 +714,45 @@ const makeStyles = (uiTheme: UITheme) =>
       color: uiTheme.textMuted,
       marginTop: 2,
     },
+    profileRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: uiTheme.surface,
+  borderRadius: radii.md,
+  padding: spacing.md,
+  marginBottom: spacing.xl,
+  borderWidth: 1,
+  borderColor: uiTheme.border,
+  ...shadows.sm,
+},
+profileAvatar: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  justifyContent: "center",
+  alignItems: "center",
+  borderWidth: 2,
+  borderColor: uiTheme.surface,
+},
+profileName: {
+  ...typography.title,
+  fontSize: 18,
+  color: uiTheme.textPrimary,
+},
+profileHint: {
+  ...typography.caption,
+  color: uiTheme.textMuted,
+  marginTop: 2,
+},
+dangerRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.md,
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.md,
+},
+dangerLabel: {
+  ...typography.body,
+  fontWeight: "600",
+},
   });
