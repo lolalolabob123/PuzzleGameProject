@@ -23,6 +23,7 @@ import {
     shadows,
     UITheme,
 } from "../constants/uiTheme";
+import { AVAILABLE_THEMES, GameTheme } from "../constants/themes";
 import {
     getCoins,
     spendCoins,
@@ -42,7 +43,10 @@ const SECTION_TITLES: Record<ShopItemCategory, string> = {
     powerup: "Power-ups",
     cosmetic: "Cosmetics",
 };
+
 const SECTION_ORDER: ShopItemCategory[] = ["theme", "powerup", "cosmetic"];
+
+const themeById = (id: string) => AVAILABLE_THEMES.find(t => t.id === id)
 
 type CoinPack = {
     id: string;
@@ -64,6 +68,7 @@ export default function Shop() {
     const [coins, setCoins] = useState(0);
     const [owned, setOwned] = useState<string[]>([]);
     const [coinModalVisible, setCoinModalVisible] = useState(false)
+    const [previewItem, setPreviewItem] = useState<ShopItem | null>(null)
 
     const refresh = useCallback(async () => {
         setCoins(await getCoins());
@@ -110,21 +115,21 @@ export default function Shop() {
         universalNotify("Coins added", `+${pack.amount} coins`)
     }
 
-    const {width: windowWidth} = useWindowDimensions()
+    const { width: windowWidth } = useWindowDimensions()
 
-    const {columnCount, cardWidth} = useMemo(() => {
+    const { columnCount, cardWidth } = useMemo(() => {
         const horizontalPadding = spacing.lg * 2
         const gap = spacing.md
         const available = windowWidth - horizontalPadding
 
         const cols =
             available < 540 ? 2 :
-            available < 820 ? 3 :
-            4;
-        
+                available < 820 ? 3 :
+                    4;
+
         const totalGap = gap * (cols - 1)
         const card = Math.floor((available - totalGap) / cols)
-        return {columnCount: cols, cardWidth: card}
+        return { columnCount: cols, cardWidth: card }
     }, [windowWidth])
 
     return (
@@ -195,6 +200,38 @@ export default function Shop() {
                 </TouchableOpacity>
             </Modal>
 
+            <Modal
+                visible={previewItem !== null}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPreviewItem(null)}>
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setPreviewItem(null)}
+                >
+                    <TouchableOpacity
+                        style={styles.modalContent}
+                        activeOpacity={1}
+                        onPress={() => { }}
+                    >
+                        {previewItem && (
+                            <ThemePreviewSheet
+                                item={previewItem}
+                                isOwned={owned.includes(previewItem.id)}
+                                canAfford={coins >= previewItem.price}
+                                onClose={() => setPreviewItem(null)}
+                                onBuy={async () => {
+                                    await handleBuy(previewItem)
+                                    setPreviewItem(null)
+                                }}
+                                uiTheme={uiTheme}
+                            />
+                        )}
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
             <ScrollView
                 contentContainerStyle={styles.scrollBody}
                 showsVerticalScrollIndicator={false}
@@ -205,7 +242,7 @@ export default function Shop() {
                     return (
                         <View key={category} style={styles.section}>
                             <Text style={styles.sectionHeader}>{SECTION_TITLES[category]}</Text>
-                            <View style={[styles.grid, {gap: spacing.md}]}>
+                            <View style={[styles.grid, { gap: spacing.md }]}>
                                 {items.map((item) => (
                                     <ItemCard
                                         key={item.id}
@@ -213,6 +250,7 @@ export default function Shop() {
                                         isOwned={!item.consumable && owned.includes(item.id)}
                                         canAfford={coins >= item.price}
                                         onBuy={() => handleBuy(item)}
+                                        onPreview={() => setPreviewItem(item)}
                                         uiTheme={uiTheme}
                                         cardWidth={cardWidth}
                                     />
@@ -231,28 +269,197 @@ type ItemCardProps = {
     isOwned: boolean;
     canAfford: boolean;
     onBuy: () => void;
+    onPreview: () => void;
     uiTheme: UITheme;
     cardWidth: number;
 };
 
-const ItemCard = ({ item, isOwned, canAfford, onBuy, uiTheme }: ItemCardProps) => {
+const ThemePreview = ({ theme }: { theme: GameTheme }) => (
+    <View
+        style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: theme.tileColor,
+            borderColor: theme.tileEdgeColor,
+            borderWidth: 1.5,
+            borderRadius: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            gap: 6,
+        }}>
+        <View
+            style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: theme.shape1Color,
+            }} />
+
+        <View
+            style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: theme.shape2Color,
+            }} />
+    </View>
+)
+
+const ThemePreviewSheet = ({
+    item,
+    isOwned,
+    canAfford,
+    onClose,
+    onBuy,
+    uiTheme,
+}: {
+    item: ShopItem;
+    isOwned: boolean;
+    canAfford: boolean;
+    onClose: () => void;
+    onBuy: () => void;
+    uiTheme: UITheme;
+}) => {
+    const theme = themeById(item.id)
+    if (!theme) return null
+
+    const tiles = Array.from({ length: 16 }, (_, i) => {
+        const row = Math.floor(i / 4)
+        const col = i % 4
+        const val = (row * col) % 2 === 0 ? 1 : 2
+        return val
+    })
+
+    const buttonLabel = isOwned
+        ? "Owned"
+        : !canAfford
+            ? `Need ${item.price} coins`
+            : `Buy for ${item.price}`
+
+    return (
+        <View style={{ alignItems: 'center' }}>
+            <Text
+                style={{
+                    fontSize: 22,
+                    fontWeight: "800",
+                    color: uiTheme.textPrimary,
+                    marginBottom: 4
+                }}>
+                {item.name}
+            </Text>
+            {item.description && (
+                <Text style={{
+                    fontSize: 13,
+                    color: uiTheme.textMuted,
+                    marginBottom: 16,
+                    textAlign: "center",
+                }}
+                >
+                    {item.description}
+                </Text>
+            )}
+
+            <View 
+            style={{
+                width: 220,
+                height: 220,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                backgroundColor: theme.tileColor,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme.tileEdgeColor,
+                overflow: "hidden",
+                marginBottom: 20,
+            }}
+            >
+                {tiles.map((val, i) => (
+                    <View
+                    key={i}
+                    style={{
+                        width: 55,
+                        height: 55,
+                        padding: 4,
+                        justifyContent: "center",
+                        borderWidth: 0.5,
+                        borderColor: theme.tileEdgeColor,
+                        backgroundColor: theme.tileColor,
+                    }}
+                    >
+                        <View
+                        style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 16,
+                            backgroundColor: val === 1 ? theme.shape1Color : theme.shape2Color,
+                        }}
+                        >
+                        </View>
+                    </View>
+                ))}
+            </View>
+
+            <TouchableOpacity
+            onPress={isOwned || !canAfford ? onClose : onBuy}
+            disabled={isOwned}
+            style={{
+                backgroundColor: isOwned
+                ? uiTheme.success
+                : !canAfford
+                ? uiTheme.surfaceMuted
+                : uiTheme.primary,
+                paddingVertical: 14,
+                paddingHorizontal: 32,
+                borderRadius: 999,
+                minWidth: 200,
+                alignItems: "center",
+            }}>
+                <Text
+                style={{
+                    fontSize: 15,
+                    fontWeight: "700",
+                    color: isOwned
+                    ? "#FFFFF"
+                    : !canAfford
+                    ? uiTheme.textMuted
+                    : uiTheme.onPrimary,
+                }}
+                >
+                    {buttonLabel}
+                </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} style={{marginTop: 8}}>
+                <Text style={{color: uiTheme.textMuted, fontSize: 14, fontWeight: "600"}}>
+                    Close
+                </Text>
+            </TouchableOpacity>
+        </View>
+    )
+}
+
+const ItemCard = ({ item, isOwned, canAfford, onBuy, onPreview, uiTheme }: ItemCardProps) => {
     const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
     const disabled = isOwned || !canAfford;
 
     return (
         <TouchableOpacity
             style={[styles.card, disabled && styles.cardDisabled]}
-            onPress={onBuy}
+            onPress={() => {
+                if (item.category === "theme") onPreview();
+                else onBuy()
+            }}
             disabled={isOwned}
             activeOpacity={0.85}
         >
             <View style={styles.cardIconWrap}>
-                {item.image ? (
+                {item.category === "theme" && themeById(item.id) ? (
+                    <ThemePreview theme={themeById(item.id)!} />
+                ) : item.image ? (
                     <Image source={item.image} style={styles.cardImage} resizeMode="contain" />
                 ) : (
                     <FontAwesome
                         name={(item.iconName ?? "gift") as any}
-                        size={36}
+                        size={26}
                         color={uiTheme.primary}
                     />
                 )}
