@@ -139,10 +139,11 @@ export default function Shop() {
                 <TouchableOpacity
                     style={styles.coinPill}
                     onPress={() => setCoinModalVisible(true)}
-                    activeOpacity={0.5}
+                    activeOpacity={0.7}
                 >
                     <FontAwesome5 name="coins" size={14} color={uiTheme.star} />
                     <Text style={styles.coinText}>{coins}</Text>
+                    <FontAwesome name="plus-circle" size={14} color={uiTheme.primary} />
                 </TouchableOpacity>
             </View>
 
@@ -277,33 +278,54 @@ type ItemCardProps = {
 const ThemePreview = ({ theme }: { theme: GameTheme }) => (
     <View
         style={{
-            flexDirection: "row",
-            alignItems: "center",
+            width: 76,
+            height: 76,
             backgroundColor: theme.tileColor,
             borderColor: theme.tileEdgeColor,
             borderWidth: 1.5,
             borderRadius: 12,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            gap: 6,
-        }}>
+            padding: 6,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 4,
+            alignContent: "center",
+            justifyContent: "center",
+        }}
+    >
         <View
             style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
+                width: 28,
+                height: 28,
+                borderRadius: 14,
                 backgroundColor: theme.shape1Color,
-            }} />
-
+            }}
+        />
         <View
             style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
+                width: 28,
+                height: 28,
+                borderRadius: 14,
                 backgroundColor: theme.shape2Color,
-            }} />
+            }}
+        />
+        <View
+            style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: theme.shape2Color,
+            }}
+        />
+        <View
+            style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: theme.shape1Color,
+            }}
+        />
     </View>
-)
+);
 
 const ThemePreviewSheet = ({
     item,
@@ -359,40 +381,40 @@ const ThemePreviewSheet = ({
                 </Text>
             )}
 
-            <View 
-            style={{
-                width: 220,
-                height: 220,
-                flexDirection: "row",
-                flexWrap: "wrap",
-                backgroundColor: theme.tileColor,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: theme.tileEdgeColor,
-                overflow: "hidden",
-                marginBottom: 20,
-            }}
+            <View
+                style={{
+                    width: 220,
+                    height: 220,
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    backgroundColor: theme.tileColor,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: theme.tileEdgeColor,
+                    overflow: "hidden",
+                    marginBottom: 20,
+                }}
             >
                 {tiles.map((val, i) => (
                     <View
-                    key={i}
-                    style={{
-                        width: 55,
-                        height: 55,
-                        padding: 4,
-                        justifyContent: "center",
-                        borderWidth: 0.5,
-                        borderColor: theme.tileEdgeColor,
-                        backgroundColor: theme.tileColor,
-                    }}
+                        key={i}
+                        style={{
+                            width: 55,
+                            height: 55,
+                            padding: 4,
+                            justifyContent: "center",
+                            borderWidth: 0.5,
+                            borderColor: theme.tileEdgeColor,
+                            backgroundColor: theme.tileColor,
+                        }}
                     >
                         <View
-                        style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 16,
-                            backgroundColor: val === 1 ? theme.shape1Color : theme.shape2Color,
-                        }}
+                            style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 16,
+                                backgroundColor: val === 1 ? theme.shape1Color : theme.shape2Color,
+                            }}
                         >
                         </View>
                     </View>
@@ -400,36 +422,36 @@ const ThemePreviewSheet = ({
             </View>
 
             <TouchableOpacity
-            onPress={isOwned || !canAfford ? onClose : onBuy}
-            disabled={isOwned}
-            style={{
-                backgroundColor: isOwned
-                ? uiTheme.success
-                : !canAfford
-                ? uiTheme.surfaceMuted
-                : uiTheme.primary,
-                paddingVertical: 14,
-                paddingHorizontal: 32,
-                borderRadius: 999,
-                minWidth: 200,
-                alignItems: "center",
-            }}>
-                <Text
+                onPress={isOwned || !canAfford ? onClose : onBuy}
+                disabled={isOwned}
                 style={{
-                    fontSize: 15,
-                    fontWeight: "700",
-                    color: isOwned
-                    ? "#FFFFF"
-                    : !canAfford
-                    ? uiTheme.textMuted
-                    : uiTheme.onPrimary,
-                }}
+                    backgroundColor: isOwned
+                        ? uiTheme.success
+                        : !canAfford
+                            ? uiTheme.surfaceMuted
+                            : uiTheme.primary,
+                    paddingVertical: 14,
+                    paddingHorizontal: 32,
+                    borderRadius: 999,
+                    minWidth: 200,
+                    alignItems: "center",
+                }}>
+                <Text
+                    style={{
+                        fontSize: 15,
+                        fontWeight: "700",
+                        color: isOwned
+                            ? "#FFFFF"
+                            : !canAfford
+                                ? uiTheme.textMuted
+                                : uiTheme.onPrimary,
+                    }}
                 >
                     {buttonLabel}
                 </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={{marginTop: 8}}>
-                <Text style={{color: uiTheme.textMuted, fontSize: 14, fontWeight: "600"}}>
+            <TouchableOpacity onPress={onClose} style={{ marginTop: 8 }}>
+                <Text style={{ color: uiTheme.textMuted, fontSize: 14, fontWeight: "600" }}>
                     Close
                 </Text>
             </TouchableOpacity>
@@ -437,13 +459,13 @@ const ThemePreviewSheet = ({
     )
 }
 
-const ItemCard = ({ item, isOwned, canAfford, onBuy, onPreview, uiTheme }: ItemCardProps) => {
+const ItemCard = ({ item, isOwned, canAfford, onBuy, onPreview, uiTheme, cardWidth }: ItemCardProps) => {
     const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
     const disabled = isOwned || !canAfford;
 
     return (
         <TouchableOpacity
-            style={[styles.card, disabled && styles.cardDisabled]}
+            style={[styles.card, { width: cardWidth }, disabled && styles.cardDisabled]}
             onPress={() => {
                 if (item.category === "theme") onPreview();
                 else onBuy()
@@ -532,12 +554,14 @@ const makeStyles = (uiTheme: UITheme) =>
             paddingBottom: spacing.xxl,
         },
         section: {
-            marginTop: spacing.lg,
+            marginTop: spacing.xl,
         },
         sectionHeader: {
             ...typography.micro,
+            fontSize: 14,
             color: uiTheme.textMuted,
             textTransform: "uppercase",
+            letterSpacing: 0.6,
             marginBottom: spacing.sm,
         },
         grid: {
@@ -551,8 +575,10 @@ const makeStyles = (uiTheme: UITheme) =>
             padding: spacing.md,
             marginBottom: spacing.md,
             alignItems: "center",
+            justifyContent: "space-between",
             borderWidth: 1,
             borderColor: uiTheme.border,
+            minHeight: 200,
             ...shadows.sm,
         },
         cardDisabled: {

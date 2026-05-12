@@ -17,7 +17,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     id: "storm",
     category: "theme",
     name: "Storm Set",
-    description: "Electric blue on deep state",
+    description: "Electric blue on deep slate.",
     price: 250,
     iconName: "cloud",
   },
