@@ -382,7 +382,7 @@ const SettingsContent = ({
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
   const [audioOn, setAudioOn] = useState(isAudioEnabled())
-  const [hapticsOn, setHaticsOn] = useState(isHapticsEnabled())
+  const [hapticsOn, setHapticsOn] = useState(isHapticsEnabled())
 
   const handleToggleAudio = async (value: boolean) => {
     setAudioOn(value)
@@ -390,7 +390,7 @@ const SettingsContent = ({
   }
 
   const handleToggleHaptics = async (value: boolean) => {
-    setHaticsOn(value)
+    setHapticsOn(value)
     await setHapticsEnabled(value)
   }
 
@@ -409,7 +409,7 @@ const SettingsContent = ({
         activeOpacity={0.85}
         >
           <View style={[styles.profileAvatar, {backgroundColor: selectedAvatar.color}]}>
-            <FontAwesome name={selectedAvatar.iconName as any} size={22} color="#FFFFF"/>
+            <FontAwesome name={selectedAvatar.iconName as any} size={22} color="#FFFFFF" />
           </View>
           <View style={{flex: 1, marginLeft: spacing.md}}>
             <Text style={styles.profileName}>{profile?.name ?? "Player"}</Text>
@@ -420,16 +420,82 @@ const SettingsContent = ({
 
         <Text style={styles.sectionSubHeader}>Feedback</Text>
         <View style={styles.toggleCard}>
-
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Sound effects</Text>
+              <Text style={styles.toggleHint}>Tile taps, wins, hints</Text>
+            </View>
+            <Switch
+              value={audioOn}
+              onValueChange={handleToggleAudio}
+              trackColor={{ false: uiTheme.surfaceMuted, true: uiTheme.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <View style={styles.toggleDivider} />
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Vibrations</Text>
+              <Text style={styles.toggleHint}>Haptic feedback on taps</Text>
+            </View>
+            <Switch
+              value={hapticsOn}
+              onValueChange={handleToggleHaptics}
+              trackColor={{ false: uiTheme.surfaceMuted, true: uiTheme.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
         </View>
 
         <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
-        <View style={styles.themeGrid}></View>
+        <View style={styles.themeGrid}>
+          {AVAILABLE_THEMES.map((theme, index) => {
+            const unlocked = isThemeUnlocked(theme.id, ownedThemeIds);
+            const isActive = currentTheme.id === theme.id;
+            return (
+              <TouchableOpacity
+                key={theme.id}
+                style={[
+                  styles.themeCard,
+                  isActive && styles.activeCard,
+                  !unlocked && styles.lockedCard,
+                ]}
+                onPress={() => {
+                  if (unlocked) onThemeSelect(index);
+                  else universalNotify("Locked", "Buy this theme in the Shop.");
+                }}
+              >
+                <View
+                  style={[
+                    styles.previewContainer,
+                    {
+                      backgroundColor: theme.tileColor,
+                      borderColor: theme.tileEdgeColor,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[styles.miniShape, { backgroundColor: theme.shape1Color }]}
+                  />
+                  <View
+                    style={[styles.miniShape, { backgroundColor: theme.shape2Color }]}
+                  />
+                </View>
+                <Text style={styles.themeLabel}>{theme.label}</Text>
+                {!unlocked && (
+                  <View style={styles.lockOverlay}>
+                    <FontAwesome name="lock" size={20} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        <View style={styles.sectionSubHeader}>Data</View>
+        <Text style={styles.sectionSubHeader}>Data</Text>
         <View style={styles.toggleCard}>
           <TouchableOpacity style={styles.dangerRow} onPress={onResetChapter}>
-            <FontAwesome name="refresh" size={18}/>
+            <FontAwesome name="refresh" size={18} color={uiTheme.warning} />
             <Text style={[styles.dangerLabel, {color: uiTheme.warning}]}>
               Reset Chapter 1
             </Text>
