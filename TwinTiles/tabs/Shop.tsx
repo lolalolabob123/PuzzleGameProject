@@ -133,7 +133,7 @@ export default function Shop() {
     }, [windowWidth])
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
                 <Text style={styles.title}>Shop</Text>
                 <TouchableOpacity

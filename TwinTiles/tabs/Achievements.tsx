@@ -32,7 +32,7 @@ export default function Achievements() {
   const totalCount = statuses.length;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Achievements</Text>
         <Text style={styles.subtitle}>

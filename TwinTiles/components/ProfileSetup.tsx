@@ -49,7 +49,7 @@ export default function ProfileSetup({
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
                 <Text style={styles.title}>
                     {isEditing ? "Edit Profile" : "Welcome!"}

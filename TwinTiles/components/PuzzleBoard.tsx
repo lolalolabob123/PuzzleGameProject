@@ -868,6 +868,8 @@ const makeStyles = (uiTheme: UITheme) =>
     container: {
       flex: 1,
       backgroundColor: uiTheme.background,
+      paddingTop: spacing.xxl + spacing.md,
+      paddingBottom: spacing.lg,
     },
     loadingText: {
       ...typography.body,

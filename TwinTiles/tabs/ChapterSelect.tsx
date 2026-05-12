@@ -126,7 +126,7 @@ export default function ChapterSelect({ navigation, route }: ChapterSelectProps)
   }, [navigation, uiTheme])
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.heading}>Chapters</Text>
         <Text style={styles.subHeading}>Choose your next puzzle</Text>
