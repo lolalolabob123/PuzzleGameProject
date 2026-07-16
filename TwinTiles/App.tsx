@@ -18,13 +18,21 @@ import { initAudio } from "./utils/audio"
 import { initHaptics } from "./utils/haptics";
 import { useTheme } from "./context/ThemeContext";
 
+// New imports for the Safe Area fix
+import { Platform } from "react-native";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
-function Tabs() {
+// Fallback padding values for web browsers (since they don't have safe area notches)
+const webInitialMetrics = {
+  insets: { top: 0, left: 0, right: 0, bottom: 0 },
+  frame: { x: 0, y: 0, width: 0, height: 0 },
+};
 
-  const { ui: uiTheme } = useTheme()
+function Tabs() {
+  const { ui: uiTheme } = useTheme();
 
   return (
     <Tab.Navigator
@@ -37,7 +45,7 @@ function Tabs() {
           } else if (route.name === "Chapters") {
             iconName = "th-large";
           } else if (route.name === "Achievements") {
-            iconName = "trophy"
+            iconName = "trophy";
           } else if (route.name === "Shop") {
             iconName = "shopping-bag";
           }
@@ -64,7 +72,7 @@ function Tabs() {
 }
 
 function MainNavigator() {
-  const { ui: uiTheme } = useTheme()
+  const { ui: uiTheme } = useTheme();
   return (
     <NavigationContainer>
       <RootStack.Navigator
@@ -81,19 +89,23 @@ function MainNavigator() {
         </RootStack.Group>
       </RootStack.Navigator>
     </NavigationContainer>
-  )
+  );
 }
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <ProfileProvider>
-          <ProfileGate>
-            <MainNavigator />
-          </ProfileGate>
-        </ProfileProvider>
-      </ThemeProvider>
+      <SafeAreaProvider 
+        initialMetrics={Platform.OS === 'web' ? webInitialMetrics : initialWindowMetrics}
+      >
+        <ThemeProvider>
+          <ProfileProvider>
+            <ProfileGate>
+              <MainNavigator />
+            </ProfileGate>
+          </ProfileProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
