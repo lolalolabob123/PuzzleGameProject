@@ -5,8 +5,8 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Dimensions,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { spacing, radii, typography, shadows, UITheme } from '../constants/uiTheme';
@@ -27,17 +27,10 @@ type LevelButtonProps = {
   itemSize: number;
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COLUMNS_PER_ROW = 4;
 const HORIZONTAL_PADDING = spacing.xl;
 const GAP_BETWEEN_COLUMNS = spacing.md;
-
-const availableWidthForTiles =
-  SCREEN_WIDTH -
-  HORIZONTAL_PADDING * 2 -
-  GAP_BETWEEN_COLUMNS * (COLUMNS_PER_ROW - 1);
-
-const DEFAULT_ITEM_SIZE = Math.floor(availableWidthForTiles / COLUMNS_PER_ROW);
+const MAX_WEB_CONTAINER_WIDTH = 430; // Matches your WebMobileWrapper maxWidth
 
 const LevelButton = ({ item, onPress, itemSize }: LevelButtonProps) => {
   const { ui: uiTheme } = useTheme();
@@ -82,7 +75,19 @@ const LevelButton = ({ item, onPress, itemSize }: LevelButtonProps) => {
 
 export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps) {
   const { ui: uiTheme } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+
+  // Dynamically calculate tile size based on screen or web frame width
+  const itemSize = useMemo(() => {
+    const effectiveWidth = Math.min(windowWidth, MAX_WEB_CONTAINER_WIDTH);
+    const availableWidth =
+      effectiveWidth -
+      HORIZONTAL_PADDING * 2 -
+      GAP_BETWEEN_COLUMNS * (COLUMNS_PER_ROW - 1);
+      
+    return Math.floor(availableWidth / COLUMNS_PER_ROW);
+  }, [windowWidth]);
 
   if (levels === undefined) {
     return (
@@ -110,7 +115,7 @@ export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps)
           <LevelButton
             item={item}
             onPress={onSelectLevel}
-            itemSize={DEFAULT_ITEM_SIZE}
+            itemSize={itemSize}
           />
         )}
         keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
