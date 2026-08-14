@@ -4,7 +4,7 @@
 
 <!-- Hero GIF -->
 <p align="center">
-  <img src="./assets/demo.gif" alt="TwinTiles Gameplay Demo" width="350" />
+  <img src="./TwinTiles/assets/demo.gif" alt="TwinTiles Gameplay Demo" width="350" />
 </p>
 
 <br />
