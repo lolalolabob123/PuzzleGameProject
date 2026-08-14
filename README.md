@@ -4,7 +4,7 @@
 
 <!-- Hero GIF -->
 <p align="center">
-  <img src="./assets/demo.gif" alt="TwinTiles Gameplay Demo" width="350" />
+  <img src="./TwinTiles/assets/demo.gif" alt="TwinTiles Gameplay Demo" width="350" />
 </p>
 
 <br />
@@ -13,7 +13,7 @@
 
 | Main Game Grid | Level Progression & Shop |
 | :---: | :---: |
-| ![Gameplay View](./assets/gameplay.png) | ![Level Progression](./assets/levels.png) |
+| ![Gameplay View](./TwinTiles/assets/gridScreenshot.png) | ![Level Progression](./TwinTiles/assets/levelProgression.png) |
 
 ---
 
