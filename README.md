@@ -13,7 +13,7 @@
 
 | Main Game Grid | Level Progression & Shop |
 | :---: | :---: |
-| ![Gameplay View](TwinTiles\assets\gridScreenshot.png) | ![Level Progression](TwinTiles\assets\levelProgression.png) |
+| ![Gameplay View](./TwinTiles/assets/gridScreenshot.png) | ![Level Progression](./TwinTiles/assets/levelProgression.png) |
 
 ---
 
