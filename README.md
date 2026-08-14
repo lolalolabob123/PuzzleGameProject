@@ -4,12 +4,14 @@
 
 <!-- Hero GIF -->
 <p align="center">
-  <img src="./assets/demo.gif" alt="TwinTiles Gameplay Demo" width="850" />
+  <img src="./assets/demo.gif" alt="TwinTiles Gameplay Demo" width="350" />
 </p>
 
-### 📱 Gameplay & UI Highlights
+<br />
 
-| Main Game Grid | Level Select & Rewards |
+### 📱 Interface Highlights
+
+| Main Game Grid | Level Progression & Shop |
 | :---: | :---: |
 | ![Gameplay View](./assets/gameplay.png) | ![Level Progression](./assets/levels.png) |
 
@@ -43,16 +45,6 @@
 * **Metro Bundler** (JS/TS module bundling)
 * **Netlify** (Production web deployment host)
 * **Git & GitHub** (Version control)
-
----
-
-## 📸 Media Asset Checklist
-
-To match your Trello Clone repo layout, create an `assets/` folder in this repository containing:
-
-1. `demo.gif`: A 10–12 second recording showing gameplay (placing a tile, triggering a match/validation rule, and score updating).
-2. `gameplay.png`: A clean, high-resolution screenshot of the main board during active gameplay.
-3. `levels.png`: A screenshot of the level select screen, shop, or achievement modal.
 
 ---
 
