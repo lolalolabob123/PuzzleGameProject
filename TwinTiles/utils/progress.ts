@@ -137,3 +137,45 @@ export const saveLevelStars = async (chapterId: number, level: number, stars: nu
     console.error("Failed to save stars", e);
   }
 };
+
+export const resetChapterProgress = async (chapterId: number) => {
+  try {
+    const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {});
+    progress[`chapter_${chapterId}`] = 1;
+    await AsyncStorage.setItem(KEYS.PROGRESS, JSON.stringify(progress));
+
+    const allKeys = await AsyncStorage.getAllKeys();
+
+    const keysToRemove = allKeys.filter(
+      (key) =>
+        key.startsWith(`level_state_${chapterId}_`) ||
+        key.startsWith(`stars_${chapterId}_`)
+    );
+    if (keysToRemove.length > 0) {
+      await AsyncStorage.multiRemove(keysToRemove);
+    }
+
+    await wait(50);
+  } catch (e) {
+    console.error("Failed to reset chapter", e);
+    throw e;
+  }
+};
+
+export const clearAllGameData = async () => {
+  try {
+    const allkeys = await AsyncStorage.getAllKeys();
+    
+    const gameKeys = allkeys.filter((key) =>
+      KEYS.prefixes.some((prefix) => key.startsWith(prefix))
+  );
+
+  if (gameKeys.length > 0) {
+    await AsyncStorage.multiRemove(gameKeys);
+  }
+
+  await wait(50);
+  } catch (e) {
+    console.error("Failed to clear all game data", e);
+  }
+};
