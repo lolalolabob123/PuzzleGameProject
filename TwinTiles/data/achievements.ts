@@ -1,4 +1,4 @@
-import { getChapterProgress, getLevelStars } from "../utils/progress";
+import { getChapterProgress, getAllLevelStars } from "../utils/progress";
 import { chapters } from "./chapters";
 
 export type Achievement = {
@@ -10,12 +10,20 @@ export type Achievement = {
   isEarned: () => Promise<boolean>;
 };
 
-const countLevelsWithStars = async (minStars: number): Promise<number> => {
+/**
+ * Batched helper: Reads all star ratings in a single pass to avoid
+ * storage waterfalls when evaluating progress across all chapters.
+ */
+const countLevelesWithStarsBatched =  async (minStars: number): Promise<number> => {
+  // A batched fetch function from progress utils
+  const allStars = await getAllLevelStars();
+
   let count = 0;
   for (const chapterIdStr of Object.keys(chapters)) {
     const chapterId = Number(chapterIdStr);
     for (const lvl of chapters[chapterId].levels) {
-      const stars = await getLevelStars(chapterId, lvl.id);
+      const starKey = `${chapterId}_${lvl.id}`;
+      const stars = allStars[starKey] ?? 0;
       if (stars >= minStars) count++;
     }
   }
@@ -29,15 +37,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Complete your first level.",
     iconName: "flag",
     reward: 25,
-    isEarned: async () => (await countLevelsWithStars(1)) >= 1,
+    isEarned: async () => (await countLevelesWithStarsBatched(1)) >= 1,
   },
   {
     id: "triple-three",
-    title: "Triple Threat",
+    title: "Tripple Threat",
     description: "Earn 3 stars on 3 levels.",
     iconName: "star",
     reward: 75,
-    isEarned: async () => (await countLevelsWithStars(3)) >= 3,
+    isEarned: async () => (await countLevelesWithStarsBatched(3)) >= 3,
   },
   {
     id: "dedicated",
@@ -45,7 +53,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Complete 10 levels.",
     iconName: "trophy",
     reward: 100,
-    isEarned: async () => (await countLevelsWithStars(1)) >= 10,
+    isEarned: async () => (await countLevelesWithStarsBatched(1)) >= 10,
   },
   {
     id: "chapter-1",
@@ -54,7 +62,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     iconName: "bookmark",
     reward: 150,
     isEarned: async () => {
-      const { solved, total } = await getChapterProgress(1);
+      const {solved, total} = await getChapterProgress(1);
       return total > 0 && solved >= total;
     },
   },
@@ -65,7 +73,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     iconName: "diamond",
     reward: 300,
     isEarned: async () => {
-      const { totalStars, maxStars } = await getChapterProgress(1);
+      const {totalStars, maxStars} = await getChapterProgress(1);
       return maxStars > 0 && totalStars >= maxStars;
     },
   },
@@ -76,11 +84,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     iconName: "crown",
     reward: 500,
     isEarned: async () => {
-      for (const id of [1, 2, 3, 4]) {
-        const { solved, total } = await getChapterProgress(id);
-        if (total === 0 || solved < total) return false;
-      }
-      return true;
+      const chapterIds = Object.keys(chapters).map(Number);
+
+      const allProgress = await Promise.all(
+        chapterIds.map((id) => getChapterProgress(id))
+      );
+
+      return allProgress.every(
+        ({solved, total}) => total > 0 && solved >= total
+      );
     },
   },
 ];
