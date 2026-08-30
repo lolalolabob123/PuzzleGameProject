@@ -1,32 +1,32 @@
-import seedrandom from "seedrandom";
-import { chapters, type Cage } from "../data/chapters";
+import seedrandom from 'seedrandom';
+
+export interface Cage {
+  indices: number[];
+  target?: number;
+}
 
 /**
- * Validators whenever placing 'color' at 'index' violates TwinTiles rules:
- * 1. No 3 of the same color consecutive horizontally or vertically (checks left, right, middle, top, bottom).
+ * Validates whether placing `color` at `index` violates rules:
+ * 1. No 3 of the same color consecutive horizontally or vertically.
  * 2. Equal count of colors per row and column (accounting for voids).
  */
 const isValid = (grid: number[], index: number, color: number, size: number): boolean => {
+  if (!grid || index < 0 || index >= grid.length) return false;
+
   const row = Math.floor(index / size);
   const col = index % size;
 
   // 1. HORIZONTAL 3-IN-A-ROW CHECKS
-  // CHeck left: [index-2, index-1, index]
   if (col >= 2 && grid[index - 1] === color && grid[index - 2] === color) return false;
-  // Check right: [index, index+1, index+2]
   if (col <= size - 3 && grid[index + 1] === color && grid[index + 2] === color) return false;
-  // Check middle: [index - 1, index, index + 1]
   if (col >= 1 && col <= size - 2 && grid[index - 1] === color && grid[index + 1] === color) return false;
 
-  // 2. VERTICAL 2-IN-A-ROW CHECKS
-  // Check top: [index-2*size, index-size, index]
-  if (row > 2 && grid[index - size] === color && grid[index - 2 * size] === color) return false;
-  // Check bottom: [index, index+size, index+2*size]
+  // 2. VERTICAL 3-IN-A-ROW CHECKS
+  if (row >= 2 && grid[index - size] === color && grid[index - 2 * size] === color) return false;
   if (row <= size - 3 && grid[index + size] === color && grid[index + 2 * size] === color) return false;
-  // Check middle: [index-size, index, index+size]
-  if (row >= 1 && row <= size && grid[index - size] === color && grid[index + size] === color) return false;
+  if (row >= 1 && row <= size - 2 && grid[index - size] === color && grid[index + size] === color) return false;
 
-  // 3. ROW / COLUMN EQUAL COLOR DISTRIBUTION LIMITS
+  // 3. ROW / COLUMN EQUAL COLOR DISTRIBUTION
   let rowVoids = 0, colVoids = 0;
   for (let i = 0; i < size; i++) {
     if (grid[row * size + i] === -1) rowVoids++;
@@ -52,8 +52,9 @@ const isValid = (grid: number[], index: number, color: number, size: number): bo
 };
 
 const fillGrid = (grid: number[], index: number, size: number, rng: any): boolean => {
+  if (!grid || !Array.isArray(grid)) return false;
   if (index === grid.length) return true;
-  if (grid[length] !== 0) return fillGrid(grid, index + 1, size, rng);
+  if (grid[index] !== 0) return fillGrid(grid, index + 1, size, rng);
 
   const choices = rng() > 0.5 ? [1, 2] : [2, 1];
 
@@ -67,7 +68,7 @@ const fillGrid = (grid: number[], index: number, size: number, rng: any): boolea
   return false;
 };
 
-export const getFixedlevel = (
+export const getFixedLevel = (
   chapterId: number,
   levelId: number,
   size: number,
@@ -78,18 +79,21 @@ export const getFixedlevel = (
   const rng = seedrandom(seed);
 
   const fullGrid = new Array(size * size).fill(0);
-  for (const v of voids) fullGrid[v] = -1;
+  for (const v of voids) {
+    if (v >= 0 && v < fullGrid.length) fullGrid[v] = -1;
+  }
 
   if (!fillGrid(fullGrid, 0, size, rng)) {
     console.error(`Puzzle generation failed for chapter ${chapterId} level ${levelId}`);
     return new Array(size * size).fill(0);
   }
 
-  const puzzle = [...fullGrid]
+  const puzzle = [...fullGrid];
 
   const positions = Array.from({ length: size * size }, (_, i) => i).filter(
     (i) => fullGrid[i] !== -1
   );
+
   for (let i = positions.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [positions[i], positions[j]] = [positions[j], positions[i]];
@@ -112,6 +116,7 @@ export const getFixedlevel = (
 };
 
 const countSolutions = (grid: number[], index: number, size: number, limit: number = 2): number => {
+  if (!grid) return 0;
   if (index === grid.length) return 1;
   if (grid[index] !== 0) return countSolutions(grid, index + 1, size, limit);
 
@@ -135,9 +140,9 @@ export const getFullSolution = (chapterId: number, levelId: number, size: number
   fillGrid(fullGrid, 0, size, rng);
 
   return fullGrid;
-}
+};
 
-export const getSeedVoids = (levelId: number, size: number, count: number): number[] => {
+export const getSeededVoids = (levelId: number, size: number, count: number): number[] => {
   const rng = seedrandom(`chapter-3-voids-${levelId}`);
   const positions = Array.from({ length: size * size }, (_, i) => i);
   for (let i = positions.length - 1; i > 0; i--) {
@@ -158,14 +163,14 @@ const generateCages = (size: number, rng: any): number[][] => {
     [order[i], order[j]] = [order[j], order[i]];
   }
 
-  const neighbours = (idx: number) => {
+  const neighbors = (idx: number) => {
     const r = Math.floor(idx / size);
     const c = idx % size;
     const out: number[] = [];
     if (r > 0) out.push(idx - size);
     if (r < size - 1) out.push(idx + size);
     if (c > 0) out.push(idx - 1);
-    if (c > size - 1) out.push(idx + 1);
+    if (c < size - 1) out.push(idx + 1);
     return out;
   };
 
@@ -178,7 +183,7 @@ const generateCages = (size: number, rng: any): number[][] => {
     while (group.length < targetSize) {
       const frontier: number[] = [];
       for (const cell of group) {
-        for (const n of neighbours(cell)) {
+        for (const n of neighbors(cell)) {
           if (assigned[n] === -1 && !frontier.includes(n)) frontier.push(n);
         }
       }
@@ -187,14 +192,14 @@ const generateCages = (size: number, rng: any): number[][] => {
       assigned[pick] = groups.length;
       group.push(pick);
     }
+
     groups.push(group);
   }
 
-  // Merge singletons
   for (let i = groups.length - 1; i >= 0; i--) {
     if (groups[i].length !== 1) continue;
     const only = groups[i][0];
-    for (const n of neighbours(only)) {
+    for (const n of neighbors(only)) {
       const otherId = assigned[n];
       if (otherId !== i && groups[otherId]) {
         groups[otherId].push(only);
@@ -207,6 +212,7 @@ const generateCages = (size: number, rng: any): number[][] => {
       }
     }
   }
+
   return groups;
 };
 
@@ -276,14 +282,14 @@ export const getChapter4Level = (
   levelId: number,
   size: number,
   difficulty: number
-): {grid: number[]; cages: Cage[]} => {
+): { grid: number[]; cages: Cage[] } => {
   const seed = `chapter-4-level-${levelId}`;
   const rng = seedrandom(seed);
 
   const solution = new Array(size * size).fill(0);
   if (!fillGrid(solution, 0, size, rng)) {
     console.error(`Chapter 4 level ${levelId} solution generation failed`);
-    return {grid: new Array(size * size).fill(0), cages: []};
+    return { grid: new Array(size * size).fill(0), cages: [] };
   }
 
   const groups = generateCages(size, rng);
@@ -293,21 +299,20 @@ export const getChapter4Level = (
     const hide = rng() < hideChance;
     return {
       indices: g,
-      target: hide ? undefined: sum,
+      target: hide ? undefined : sum,
     };
   });
 
   const puzzle = [...solution];
-  const positions = Array.from({length: size * size}, (_, i) => i);
+  const positions = Array.from({ length: size * size }, (_, i) => i);
   for (let i = positions.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [positions[i], positions[j] = positions[j], positions[i]];
+    [positions[i], positions[j]] = [positions[j], positions[i]];
   }
 
   const targetRemove = Math.floor(
     positions.length * Math.min(0.75, difficulty + 0.15)
   );
-
   let removedCount = 0;
 
   for (const pos of positions) {
@@ -320,7 +325,7 @@ export const getChapter4Level = (
       removedCount++;
     }
   }
-  return {grid: puzzle, cages};
+  return { grid: puzzle, cages };
 };
 
 export const colorCages = (
@@ -328,21 +333,23 @@ export const colorCages = (
   size: number,
   paletteSize: number
 ): number[] => {
+  if (!cages || cages.length === 0) return [];
+  
   const cageOf = new Array<number>(size * size).fill(-1);
-  cages.forEach((c, i) => c.indices.forEach((idx) => {cageOf[idx] = i;}));
+  cages.forEach((c, i) => c.indices.forEach((idx) => { cageOf[idx] = i; }));
 
   const adj: Set<number>[] = cages.map(() => new Set());
   for (let idx = 0; idx < cageOf.length; idx++) {
     const me = cageOf[idx];
     if (me === -1) continue;
     const row = Math.floor(idx / size), col = idx % size;
-    const neighbours = [
+    const neighbors = [
       row > 0 ? idx - size : -1,
       row < size - 1 ? idx + size : -1,
       col > 0 ? idx - 1 : -1,
       col < size - 1 ? idx + 1 : -1,
     ];
-    for (const n of neighbours) {
+    for (const n of neighbors) {
       if (n === -1) continue;
       const other = cageOf[n];
       if (other !== -1 && other !== me) {
@@ -370,20 +377,20 @@ export const getDailyLevel = (
   dateStr: string,
   size: number = 6,
   difficulty: number = 0.55
-): {grid: number[]; size: number} => {
+): { grid: number[]; size: number } => {
   const seed = `daily-${dateStr}`;
   const rng = seedrandom(seed);
-  
+
   const fullGrid = new Array(size * size).fill(0);
 
   if (!fillGrid(fullGrid, 0, size, rng)) {
     console.error(`Daily puzzle generation failed for ${dateStr}`);
-    return {grid: new Array(size * size).fill(0), size};
+    return { grid: new Array(size * size).fill(0), size };
   }
 
   const puzzle = [...fullGrid];
 
-  const positions = Array.from({length: size * size}, (_, i) => i);
+  const positions = Array.from({ length: size * size }, (_, i) => i);
   for (let i = positions.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [positions[i], positions[j]] = [positions[j], positions[i]];
@@ -397,10 +404,10 @@ export const getDailyLevel = (
     const backup = puzzle[pos];
     puzzle[pos] = 0;
     if (countSolutions([...puzzle], 0, size) !== 1) {
-      puzzle[pos] = backup
+      puzzle[pos] = backup;
     } else {
       removedCount++;
     }
   }
-  return {grid: puzzle, size};
+  return { grid: puzzle, size };
 };

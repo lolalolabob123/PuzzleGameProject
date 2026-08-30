@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { GameScreenProps } from "../navigation/types";
+import React, {useMemo} from 'react';
+import {View, StyleSheet, Text, TouchableOpacity, Touchable} from 'react-native';
+import { GameScreenProps } from '../navigation/types';
 import PuzzleBoard from "../components/PuzzleBoard";
-import { chapters } from "../data/chapters";
+import { chapters } from '../data/chapters';
 import { useTheme } from '../context/ThemeContext';
 import { FontAwesome } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   spacing,
   radii,
@@ -16,16 +16,23 @@ import {
 import { getDailyLevel } from '../utils/levelGenerator';
 import { todayKey } from '../utils/daily';
 
-export default function GameScreen({ route, navigation }: GameScreenProps) {
-  const { levelId, chapterId, forcedReset, themeIndex, daily } = route.params;
+export default function GameScreen({route, navigation}: GameScreenProps) {
+  const {
+    levelId = 1,
+    chapterId = 1,
+    forcedReset = false,
+    themeIndex = 0,
+    daily = false
+  } = route.params || {};
 
-  const { ui: uiTheme } = useTheme();
-  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const {ui: uiTheme} = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => makeStyles(uiTheme, insets.top), [uiTheme, insets.top]);
 
   const levelData = useMemo(() => {
     if (daily) {
-      const {grid, size} = getDailyLevel(todayKey())
-      return {id: 0, size, grid}
+      const {grid, size} = getDailyLevel(todayKey());
+      return {id: 0, size, grid};
     }
     const chapter = chapters[chapterId];
     return chapter?.levels.find((l) => l.id === levelId);
@@ -33,8 +40,8 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
 
   const handleNextLevel = () => {
     if (daily) {
-      navigation.goBack()
-      return
+      navigation.goBack();
+      return;
     }
 
     const currentChapter = chapters[chapterId];
@@ -56,105 +63,109 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   };
 
   if (!levelData) {
-    return <ErrorState levelId={levelId} onBack={() => navigation.goBack()} />;
+    return <ErrorState levelId={levelId} onBack={() => navigation.goBack()}/>;
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <TouchableOpacity
-        style={styles.backFab}
-        onPress={() => navigation.goBack()}
-        activeOpacity={0.8}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-        <FontAwesome name='chevron-left' size={20} color={uiTheme.textPrimary} />
-      </TouchableOpacity>
+  const boardKey = daily
+    ? `board-daily-${todayKey}`
+    : `board-${chapterId}-${levelId}`;
 
-      <PuzzleBoard
-        key={`board-${chapterId}-${levelId}-${daily ? "daily" : "normal"}`}
-        levelData={levelData}
-        chapterId={chapterId}
-        level={levelId}
-        size={levelData.size}
-        onNextLevel={handleNextLevel}
-        forcedReset={forcedReset}
-        daily={daily}
-      />
-    </SafeAreaView>
-  );
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <TouchableOpacity
+          style={styles.backFab}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <FontAwesome name='chevron-left' size={10} color={uiTheme.textPrimary} />
+          </TouchableOpacity>
+
+          <PuzzleBoard
+            key={boardKey}
+            levelData={levelData}
+            chapterId={chapterId}
+            level={levelId}
+            size={levelData.size}
+            onNextLevel={handleNextLevel}
+            forcedReset={forcedReset}
+            daily={daily}
+            />
+            </SafeAreaView>
+    );
 }
 
 const ErrorState = ({
   levelId,
-  onBack,
+  onBack
 }: {
   levelId: number;
   onBack: () => void;
 }) => {
-  const { ui: uiTheme } = useTheme();
-  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const {ui: uiTheme} = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => makeStyles(uiTheme, insets.top), [uiTheme, insets.top]);
 
   return (
-    <View style={styles.errorContainer}>
+    <view style={styles.errorContainer}>
       <Text style={styles.errorText}>Level {levelId} not found!</Text>
       <Text style={styles.errorSubtext}>
-        This level might not be added to your chapters data yet.
+        This level might not be added to your chapta data yet.
       </Text>
       <TouchableOpacity style={styles.backButton} onPress={onBack}>
         <Text style={styles.backButtonText}>Go Back</Text>
       </TouchableOpacity>
-    </View>
+    </view>
   );
 };
 
-const makeStyles = (uiTheme: UITheme) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: uiTheme.background,
-    },
-    errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: spacing.xl,
-      backgroundColor: uiTheme.background,
-    },
-    errorText: {
-      ...typography.title,
-      fontSize: 22,
-      color: uiTheme.danger,
-    },
-    errorSubtext: {
-      ...typography.body,
-      color: uiTheme.textMuted,
-      textAlign: 'center',
-      marginVertical: spacing.sm + 2,
-    },
-    backButton: {
-      marginTop: spacing.xl,
-      paddingHorizontal: spacing.xxl - 8,
-      paddingVertical: spacing.md,
-      backgroundColor: uiTheme.primary,
-      borderRadius: radii.md,
-      ...shadows.sm,
-    },
-    backButtonText: {
-      color: uiTheme.onPrimary,
-      fontWeight: 'bold',
-    },
-    backFab: {
-      position: 'absolute',
-      top: spacing.md,
-      left: spacing.md,
-      zIndex: 10,
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: uiTheme.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: uiTheme.border,
-      ...shadows.sm,
-    },
-  });
+const makeStyles = (uiTheme: UITheme, topInset:  number) =>
+    StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: uiTheme.background,
+      },
+      errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
+        backgroundColor: uiTheme.background,
+      },
+      errorText: {
+        ...typography.title,
+        fontSize: 22,
+        color: uiTheme.danger,
+      },
+      errorSubtext: {
+        ...typography.body,
+        color: uiTheme.textMuted,
+        textAlign: 'center',
+        marginVertical: spacing.sm + 2,
+      },
+      backButton: {
+        marginTop: spacing.xl,
+        paddingHorizontal: spacing.xxl - 8,
+        paddingVertical: spacing.md,
+        backgroundColor: uiTheme.primary,
+        borderRadius: radii.md,
+        ...shadows.sm,
+      },
+      backButtonText: {
+        color: uiTheme.onPrimary,
+        fontWeight: 'bold',
+      },
+      backFab: {
+        position: 'absolute',
+        top: topInset + spacing.xs,
+        left: spacing.md,
+        zIndex: 10,
+        width: 40,
+        borderRadius: 20,
+        backgroundColor: uiTheme.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: uiTheme.border,
+        ...shadows.sm,
+      },
+    });
