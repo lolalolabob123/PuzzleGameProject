@@ -1,18 +1,17 @@
 import React, { useMemo, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
+
 import { GameScreenProps } from "../navigation/types";
 import PuzzleBoard from "../components/PuzzleBoard";
+import { chapters } from "../data/chapters";
+
 import { useTheme } from "../context/ThemeContext";
+
 import {
   spacing,
   radii,
@@ -20,11 +19,14 @@ import {
   shadows,
   UITheme,
 } from "../constants/uiTheme";
+
 import {
   getDailyLevel,
   getFixedLevel,
   getSeededVoids,
+  getChapter4Level,
 } from "../utils/levelGenerator";
+
 import { todayKey } from "../utils/daily";
 
 export default function GameScreen({
@@ -40,6 +42,7 @@ export default function GameScreen({
   } = route.params || {};
 
   const { ui: uiTheme } = useTheme();
+
   const insets = useSafeAreaInsets();
 
   const styles = useMemo(
@@ -47,12 +50,30 @@ export default function GameScreen({
     [uiTheme, insets.top]
   );
 
+  /*
+   * ---------------------------------------------------------
+   * LEVEL DATA
+   * ---------------------------------------------------------
+   *
+   * Chapter 1-3:
+   *   Uses the normal Takuzu-style generator.
+   *
+   * Chapter 3:
+   *   Also receives seeded void cells.
+   *
+   * Chapter 4:
+   *   Uses the dedicated cage generator.
+   *
+   * Daily:
+   *   Uses the daily puzzle generator.
+   */
   const levelData = useMemo(() => {
     /*
      * DAILY LEVEL
      */
     if (daily) {
       const dateKey = todayKey();
+
       const { grid, size } = getDailyLevel(dateKey);
 
       return {
@@ -63,13 +84,60 @@ export default function GameScreen({
     }
 
     /*
-     * STANDARD LEVEL
-     *
-     * Chapter 3 is the only chapter that uses void cells.
+     * All current normal levels use a 6x6 board.
      */
     const size = 6;
+
+    /*
+     * Difficulty of generated puzzles.
+     */
     const difficulty = 0.55;
 
+    /*
+     * -------------------------------------------------------
+     * CHAPTER 4
+     * -------------------------------------------------------
+     *
+     * Chapter 4 is different from Chapters 1-3.
+     *
+     * It uses cages, so we MUST use getChapter4Level().
+     *
+     * getChapter4Level() returns:
+     *
+     * {
+     *   grid: number[],
+     *   cages: Cage[]
+     * }
+     *
+     * PuzzleBoard then receives the cage information and
+     * draws the cage borders, colours and targets.
+     */
+    if (chapterId === 4) {
+      const { grid, cages } = getChapter4Level(
+        levelId,
+        size,
+        difficulty
+      );
+
+      return {
+        id: levelId,
+        size,
+        grid,
+        cages,
+      };
+    }
+
+    /*
+     * -------------------------------------------------------
+     * CHAPTERS 1-3
+     * -------------------------------------------------------
+     */
+
+    /*
+     * Chapter 3 uses void cells.
+     *
+     * Chapters 1 and 2 receive no voids.
+     */
     const voids =
       chapterId === 3
         ? getSeededVoids(levelId, size, 2)
@@ -91,26 +159,145 @@ export default function GameScreen({
     };
   }, [chapterId, levelId, daily]);
 
-const handleNextLevel = useCallback(() => {
-  if (daily) {
-    navigation.goBack();
-    return;
-  }
+  /*
+   * ---------------------------------------------------------
+   * NEXT LEVEL / CHAPTER PROGRESSION
+   * ---------------------------------------------------------
+   */
+  const handleNextLevel = useCallback(() => {
+    /*
+     * Daily puzzles don't have a next level.
+     */
+    if (daily) {
+      navigation.goBack();
+      return;
+    }
 
-  navigation.replace("Game", {
-    levelId: levelId + 1,
+    /*
+     * Find the current chapter.
+     */
+    const currentChapter = chapters[chapterId];
+
+    if (!currentChapter) {
+      navigation.goBack();
+      return;
+    }
+
+    /*
+     * -------------------------------------------------------
+     * CHAPTER 3 -> CHAPTER 4
+     * -------------------------------------------------------
+     *
+     * Chapter 3 has exactly 20 levels.
+     *
+     * Therefore:
+     *
+     * Chapter 3 Level 20
+     *        ↓
+     * Chapter 4 Level 1
+     *
+     * We explicitly stop Chapter 3 from generating
+     * Level 21, Level 22, etc.
+     */
+    if (chapterId === 3 && levelId >= 20) {
+      const nextChapter = chapters[4];
+
+      if (
+        nextChapter &&
+        nextChapter.levels.length > 0
+      ) {
+        const firstLevel = nextChapter.levels[0];
+
+        navigation.replace("Game", {
+          levelId: firstLevel.id,
+          chapterId: 4,
+          forcedReset: true,
+          themeIndex: themeIndex ?? 0,
+        });
+      } else {
+        navigation.goBack();
+      }
+
+      return;
+    }
+
+    /*
+     * -------------------------------------------------------
+     * NORMAL NEXT LEVEL
+     * -------------------------------------------------------
+     */
+    const currentIndex =
+      currentChapter.levels.findIndex(
+        (l) => l.id === levelId
+      );
+
+    /*
+     * If another level exists inside the current chapter,
+     * go to it.
+     */
+    if (
+      currentIndex !== -1 &&
+      currentIndex <
+        currentChapter.levels.length - 1
+    ) {
+      const nextLevel =
+        currentChapter.levels[currentIndex + 1];
+
+      navigation.replace("Game", {
+        levelId: nextLevel.id,
+        chapterId,
+        forcedReset: true,
+        themeIndex: themeIndex ?? 0,
+      });
+
+      return;
+    }
+
+    /*
+     * -------------------------------------------------------
+     * END OF CHAPTER
+     * -------------------------------------------------------
+     *
+     * If we reach the end of another chapter, move to the
+     * first level of the next chapter.
+     */
+    const nextChapterId = chapterId + 1;
+
+    const nextChapter =
+      chapters[nextChapterId];
+
+    if (
+      nextChapter &&
+      nextChapter.levels.length > 0
+    ) {
+      const firstLevel =
+        nextChapter.levels[0];
+
+      navigation.replace("Game", {
+        levelId: firstLevel.id,
+        chapterId: nextChapterId,
+        forcedReset: true,
+        themeIndex: themeIndex ?? 0,
+      });
+    } else {
+      /*
+       * No more chapters.
+       */
+      navigation.goBack();
+    }
+  }, [
+    daily,
     chapterId,
-    forcedReset: true,
-    themeIndex: themeIndex ?? 0,
-  });
-}, [
-  daily,
-  chapterId,
-  levelId,
-  navigation,
-  themeIndex,
-]);
+    levelId,
+    navigation,
+    themeIndex,
+  ]);
 
+  /*
+   * ---------------------------------------------------------
+   * ERROR STATE
+   * ---------------------------------------------------------
+   */
   if (!levelData) {
     return (
       <ErrorState
@@ -120,6 +307,14 @@ const handleNextLevel = useCallback(() => {
     );
   }
 
+  /*
+   * ---------------------------------------------------------
+   * BOARD KEY
+   * ---------------------------------------------------------
+   *
+   * Changing this key forces PuzzleBoard to re-initialize
+   * when changing levels.
+   */
   const boardKey = daily
     ? `board-daily-${todayKey()}`
     : `board-${chapterId}-${levelId}`;
@@ -161,6 +356,12 @@ const handleNextLevel = useCallback(() => {
   );
 }
 
+/*
+ * -----------------------------------------------------------
+ * ERROR STATE
+ * -----------------------------------------------------------
+ */
+
 const ErrorState = ({
   levelId,
   onBack,
@@ -169,6 +370,7 @@ const ErrorState = ({
   onBack: () => void;
 }) => {
   const { ui: uiTheme } = useTheme();
+
   const insets = useSafeAreaInsets();
 
   const styles = useMemo(
@@ -183,7 +385,8 @@ const ErrorState = ({
       </Text>
 
       <Text style={styles.errorSubtext}>
-        This level might not be available yet.
+        This level might not be added to your chapter
+        data yet.
       </Text>
 
       <TouchableOpacity
@@ -198,6 +401,12 @@ const ErrorState = ({
     </View>
   );
 };
+
+/*
+ * -----------------------------------------------------------
+ * STYLES
+ * -----------------------------------------------------------
+ */
 
 const makeStyles = (
   uiTheme: UITheme,
@@ -260,4 +469,3 @@ const makeStyles = (
       ...shadows.sm,
     },
   });
-
