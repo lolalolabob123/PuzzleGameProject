@@ -14,8 +14,7 @@ export type Achievement = {
  * Batched helper: Reads all star ratings in a single pass to avoid
  * storage waterfalls when evaluating progress across all chapters.
  */
-const countLevelesWithStarsBatched =  async (minStars: number): Promise<number> => {
-  // A batched fetch function from progress utils
+const countLevelsWithStarsBatched = async (minStars: number): Promise<number> => {
   const allStars = await getAllLevelStars();
 
   let count = 0;
@@ -37,15 +36,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Complete your first level.",
     iconName: "flag",
     reward: 25,
-    isEarned: async () => (await countLevelesWithStarsBatched(1)) >= 1,
+    isEarned: async () => (await countLevelsWithStarsBatched(1)) >= 1,
   },
   {
     id: "triple-three",
-    title: "Tripple Threat",
+    title: "Triple Threat",
     description: "Earn 3 stars on 3 levels.",
     iconName: "star",
     reward: 75,
-    isEarned: async () => (await countLevelesWithStarsBatched(3)) >= 3,
+    isEarned: async () => (await countLevelsWithStarsBatched(3)) >= 3,
   },
   {
     id: "dedicated",
@@ -53,7 +52,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Complete 10 levels.",
     iconName: "trophy",
     reward: 100,
-    isEarned: async () => (await countLevelesWithStarsBatched(1)) >= 10,
+    isEarned: async () => (await countLevelsWithStarsBatched(1)) >= 10,
   },
   {
     id: "chapter-1",
@@ -62,7 +61,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     iconName: "bookmark",
     reward: 150,
     isEarned: async () => {
-      const {solved, total} = await getChapterProgress(1);
+      const { solved, total } = await getChapterProgress(1);
       return total > 0 && solved >= total;
     },
   },
@@ -73,7 +72,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     iconName: "diamond",
     reward: 300,
     isEarned: async () => {
-      const {totalStars, maxStars} = await getChapterProgress(1);
+      const { totalStars, maxStars } = await getChapterProgress(1);
       return maxStars > 0 && totalStars >= maxStars;
     },
   },
@@ -91,7 +90,7 @@ export const ACHIEVEMENTS: Achievement[] = [
       );
 
       return allProgress.every(
-        ({solved, total}) => total > 0 && solved >= total
+        ({ solved, total }) => total > 0 && solved >= total
       );
     },
   },

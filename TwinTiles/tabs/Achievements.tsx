@@ -11,28 +11,80 @@ import { Achievement } from "../data/achievements";
 
 type Status = { achievement: Achievement; earned: boolean };
 
+const AchievementRow = React.memo(
+  ({
+    status,
+    styles,
+    uiTheme,
+  }: {
+    status: Status;
+    styles: ReturnType<typeof makeStyles>;
+    uiTheme: UITheme;
+  }) => {
+    const { achievement, earned } = status;
+
+    return (
+      <View style={[styles.row, !earned && styles.rowLocked]}>
+        <View style={[styles.iconWrap, earned ? styles.iconWrapEarned : styles.iconWrapLocked]}>
+          <FontAwesome
+            name={achievement.iconName as keyof typeof FontAwesome.glyphMap}
+            size={26}
+            color={earned ? "#FFFFFF" : uiTheme.textMuted}
+          />
+        </View>
+
+        <View style={styles.body}>
+          <Text style={styles.rowTitle}>{achievement.title}</Text>
+          <Text style={styles.rowDesc} numberOfLines={2}>
+            {achievement.description}
+          </Text>
+        </View>
+
+        <View style={styles.rewardPill}>
+          <FontAwesome5 name="coins" size={12} color={uiTheme.star} />
+          <Text style={styles.rewardText}>{achievement.reward}</Text>
+        </View>
+
+        {earned && (
+          <View style={styles.checkBadge}>
+            <FontAwesome name="check" size={11} color="#FFFFFF" />
+          </View>
+        )}
+      </View>
+    );
+  }
+);
+
 export default function Achievements() {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
-
   const [statuses, setStatuses] = useState<Status[]>([]);
-
-  const refresh = useCallback(async () => {
-    await checkAndGrantAchievements();
-    setStatuses(await getAchievementStatus());
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      refresh();
-    }, [refresh])
+      let isMounted = true;
+
+      const refreshData = async () => {
+        await checkAndGrantAchievements();
+        const updatedStatuses = await getAchievementStatus();
+        if (isMounted) {
+          setStatuses(updatedStatuses);
+        }
+      };
+
+      refreshData();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [])
   );
 
-  const earnedCount = statuses.filter(s => s.earned).length;
+  const earnedCount = useMemo(() => statuses.filter((s) => s.earned).length, [statuses]);
   const totalCount = statuses.length;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <Text style={styles.title}>Achievements</Text>
         <Text style={styles.subtitle}>
@@ -44,34 +96,13 @@ export default function Achievements() {
         contentContainerStyle={styles.scrollBody}
         showsVerticalScrollIndicator={false}
       >
-        {statuses.map(({ achievement, earned }) => (
-          <View
-            key={achievement.id}
-            style={[styles.row, !earned && styles.rowLocked]}
-          >
-            <View style={[styles.iconWrap, earned ? styles.iconWrapEarned : styles.iconWrapLocked]}>
-              <FontAwesome
-                name={achievement.iconName as any}
-                size={26}
-                color={earned ? "#FFFFFF" : uiTheme.textMuted}
-              />
-            </View>
-            <View style={styles.body}>
-              <Text style={styles.rowTitle}>{achievement.title}</Text>
-              <Text style={styles.rowDesc} numberOfLines={2}>
-                {achievement.description}
-              </Text>
-            </View>
-            <View style={styles.rewardPill}>
-              <FontAwesome5 name="coins" size={12} color={uiTheme.star} />
-              <Text style={styles.rewardText}>{achievement.reward}</Text>
-            </View>
-            {earned && (
-              <View style={styles.checkBadge}>
-                <FontAwesome name="check" size={11} color="#FFFFFF" />
-              </View>
-            )}
-          </View>
+        {statuses.map((status) => (
+          <AchievementRow
+            key={status.achievement.id}
+            status={status}
+            styles={styles}
+            uiTheme={uiTheme}
+          />
         ))}
       </ScrollView>
     </SafeAreaView>

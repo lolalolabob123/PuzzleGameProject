@@ -7,6 +7,7 @@ import { useProfile } from "../context/ProfileContext"
 import { AVAILABLE_AVATARS } from "../data/avatars"
 import { useTheme } from "../context/ThemeContext"
 import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme"
+import { DEFAULT_PROFILE } from "../utils/profile" // <-- Import DEFAULT_PROFILE
 
 type Props = {
     initialName?: string;
@@ -23,7 +24,9 @@ export default function ProfileSetup({
 }: Props) {
     const { ui: uiTheme } = useTheme()
     const styles = React.useMemo(() => makeStyles(uiTheme), [uiTheme])
-    const { updateProfile } = useProfile()
+    
+    // 1. Get profile from context
+    const { profile, updateProfile } = useProfile()
 
     const [name, setName] = useState(initialName)
     const [selectedAvatarId, setSelectedAvatarId] = useState<string>(
@@ -41,10 +44,19 @@ export default function ProfileSetup({
         if (trimmed.length > 20) {
             Platform.OS === "web"
                 ? window.alert("Name must be 20 characters or fewer")
-                : Alert.alert("Too long", "Name must be 20 charactersor fewer")
+                : Alert.alert("Too long", "Name must be 20 characters or fewer")
             return
         }
-        await updateProfile({ name: trimmed, avatarId: selectedAvatarId })
+
+        // 2. Spread existing profile or fallback to DEFAULT_PROFILE
+        const baseProfile = profile ?? DEFAULT_PROFILE;
+
+        await updateProfile({
+            ...baseProfile,
+            name: trimmed,
+            avatarId: selectedAvatarId,
+        });
+
         onComplete?.()
     }
 
@@ -83,7 +95,7 @@ export default function ProfileSetup({
                                 ]}
                                 activeOpacity={0.85}
                                 >
-                                    <FontAwesome  name={avatar.iconName as any} size={28} color="#FFFFFF"/>
+                                    <FontAwesome name={avatar.iconName as any} size={28} color="#FFFFFF"/>
                                 </TouchableOpacity>
                         )
                     })}

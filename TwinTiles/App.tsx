@@ -50,13 +50,13 @@ function WebMobileWrapper({ children }: { children: React.ReactNode }) {
 }
 
 function Tabs() {
-  const {ui: uiTheme} = useTheme();
+  const { ui: uiTheme } = useTheme();
 
   return (
     <Tab.Navigator
-      screenOptions={({route}) => ({
+      screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({color, size}) => {
+        tabBarIcon: ({ color, size }) => {
           let iconName: keyof typeof FontAwesome.glyphMap = "circle";
           if (route.name === "Home") {
             iconName = "home";
@@ -71,7 +71,7 @@ function Tabs() {
         },
         tabBarActiveTintColor: uiTheme.primary,
         tabBarInactiveTintColor: uiTheme.textMuted,
-        tabBarSTyle: {
+        tabBarStyle: {
           backgroundColor: uiTheme.surface,
           borderTopColor: uiTheme.border,
           borderTopWidth: 1,
@@ -80,75 +80,76 @@ function Tabs() {
           fontWeight: "600",
         },
       })}
-      >
-        <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Chapters" component={ChapterSelect} />
-        <Tab.Screen name="Achievements" component={Achievements} />
-        <Tab.Screen name="Shop" component={Shop} />
-      </Tab.Navigator>
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Chapters" component={ChapterSelect} />
+      <Tab.Screen name="Achievements" component={Achievements} />
+      <Tab.Screen name="Shop" component={Shop} />
+    </Tab.Navigator>
   );
 }
 
 function MainNavigator() {
-  const {ui: uiTheme} = useTheme();
+  const { ui: uiTheme } = useTheme();
 
   // Initialize hardware/system integrations on startup
   useEffect(() => {
     initAudio();
-    initHaptics()
+    initHaptics();
   }, []);
 
   return (
     <NavigationContainer>
       <StatusBar barStyle="light-content" backgroundColor={uiTheme.surface} />
       <RootStack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: uiTheme.surface},
-        headerTintColor: uiTheme.textPrimary,
-        headerTitleStyle: {fontWeight: "700"},
-      }}
+        screenOptions={{
+          headerStyle: { backgroundColor: uiTheme.surface },
+          headerTintColor: uiTheme.textPrimary,
+          headerTitleStyle: { fontWeight: "700" },
+        }}
       >
         <RootStack.Screen
           name="Main"
           component={Tabs}
-          options={{headerShown: false}}
+          options={{ headerShown: false }}
         />
         <RootStack.Screen
           name="Game"
           component={GameScreen}
-          options={{headerShown: false, gestureEnabled: false}}
+          options={{ headerShown: false, gestureEnabled: false }}
         />
         <RootStack.Screen
           name="LevelModal"
           component={LevelModalScreen}
           options={{
             presentation: "modal",
-            title: "Select a Level"
+            title: "Select a Level",
           }}
         />
       </RootStack.Navigator>
     </NavigationContainer>
-  )
+  );
 }
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{flex: 1}}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider
-        initialMetrics={Platform.OS === "web" ? webInitialMetrics: initialWindowMetrics}
-        >
+        initialMetrics={Platform.OS === "web" ? webInitialMetrics : initialWindowMetrics}
+      >
+        {/* ProfileProvider MUST be outside ThemeProvider so ThemeProvider can use useProfile() */}
+        <ProfileProvider>
           <ThemeProvider>
-            <ProfileProvider>
-              <ProfileGate>
-                <WebMobileWrapper>
-                  <MainNavigator/>
-                </WebMobileWrapper>
-              </ProfileGate>
-            </ProfileProvider>
+            <ProfileGate>
+              <WebMobileWrapper>
+                <MainNavigator />
+              </WebMobileWrapper>
+            </ProfileGate>
           </ThemeProvider>
-        </SafeAreaProvider>
+        </ProfileProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({
       web: {
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.6",
+        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.6)",
         borderRadius: 24,
         borderWidth: 1,
         borderColor: "#334155",

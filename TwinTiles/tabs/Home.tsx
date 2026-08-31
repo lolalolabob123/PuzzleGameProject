@@ -27,14 +27,7 @@ import ProfileSetup from "../components/ProfileSetup";
 import { isAudioEnabled, setAudioEnabled } from "../utils/audio";
 import { isHapticsEnabled, setHapticsEnabled } from "../utils/haptics";
 import DailyCard from "../components/DailyCard";
-import { todayKey } from "../utils/daily"
-import {
-  spacing,
-  radii,
-  typography,
-  shadows,
-  UITheme,
-} from "../constants/uiTheme";
+import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
 
 if (Platform.OS === "web") {
   const originalWarn = console.warn;
@@ -152,11 +145,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           onPress={() => setInfoVisible(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <FontAwesome
-            name="info-circle"
-            size={22}
-            color={uiTheme.textPrimary}
-          />
+          <FontAwesome name="info-circle" size={22} color={uiTheme.textPrimary} />
         </TouchableOpacity>
 
         <Text style={styles.appTitle}>TwinTiles</Text>
@@ -187,6 +176,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           Pick up where you left off, or jump into a new chapter.
         </Text>
       </View>
+
       <DailyCard
         onPlay={() =>
           navigation.navigate("Game", {
@@ -197,6 +187,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           })
         }
       />
+
       <View style={styles.ctaRow}>
         <TouchableOpacity
           style={[styles.ctaCard, styles.ctaCardPrimary]}
@@ -231,12 +222,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       <View style={styles.rankContainer}>
         <Text style={styles.rankEyebrow}>Your rank</Text>
         <Text style={styles.rankText}>—</Text>
-        <Text style={styles.rankCaption}>
-          Earn stars to climb the leaderboard
-        </Text>
+        <Text style={styles.rankCaption}>Earn stars to climb the leaderboard</Text>
       </View>
 
-      {/* ── Edit Profile sheet (sibling of menu modal, NOT nested) ───── */}
+      {/* Profile Edit Modal */}
       <Modal
         visible={editProfileVisible}
         animationType="slide"
@@ -251,7 +240,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         />
       </Modal>
 
-      {/*How to Play*/}
+      {/* How to Play Modal */}
       <Modal
         visible={infoVisible}
         animationType="slide"
@@ -261,7 +250,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <HowToPlay onClose={() => setInfoVisible(false)} />
       </Modal>
 
-      {/*Settings*/}
+      {/* Settings Modal */}
       <Modal
         visible={settingsVisible}
         animationType="slide"
@@ -276,8 +265,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           profile={profile}
           selectedAvatar={selectedAvatar}
           onEditProfile={() => {
-            setSettingsVisible(false)
-            setTimeout(() => setEditProfileVisible(true), 250)
+            setSettingsVisible(false);
+            setTimeout(() => setEditProfileVisible(true), 250);
           }}
           onResetChapter={handleResetChapter}
           onFullReset={handleFullReset}
@@ -331,38 +320,13 @@ const Rule = ({ title, detail }: { title: string; detail: string }) => {
   );
 };
 
-type MenuOptionProps = {
-  icon: React.ComponentProps<typeof FontAwesome>["name"];
-  label: string;
-  onPress: () => void;
-  color?: string;
-  uiTheme: UITheme;
-};
-
-const MenuOption = ({
-  icon,
-  label,
-  onPress,
-  color,
-  uiTheme,
-}: MenuOptionProps) => {
-  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
-  const tone = color ?? uiTheme.textPrimary;
-  return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <FontAwesome name={icon} size={18} color={tone} />
-      <Text style={[styles.menuText, { color: tone }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-};
-
 type SettingsContentProps = {
   currentTheme: GameTheme;
   onThemeSelect: (index: number) => void;
   onClose: () => void;
   ownedThemeIds: string[];
   profile: ReturnType<typeof useProfile>["profile"];
-  selectedAvatar: typeof AVAILABLE_AVATARS[number];
+  selectedAvatar: (typeof AVAILABLE_AVATARS)[number];
   onEditProfile: () => void;
   onResetChapter: () => void;
   onFullReset: () => void;
@@ -381,18 +345,18 @@ const SettingsContent = ({
 }: SettingsContentProps) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
-  const [audioOn, setAudioOn] = useState(isAudioEnabled())
-  const [hapticsOn, setHapticsOn] = useState(isHapticsEnabled())
+  const [audioOn, setAudioOn] = useState(isAudioEnabled());
+  const [hapticsOn, setHapticsOn] = useState(isHapticsEnabled());
 
   const handleToggleAudio = async (value: boolean) => {
-    setAudioOn(value)
-    await setAudioEnabled(value)
-  }
+    setAudioOn(value);
+    await setAudioEnabled(value);
+  };
 
   const handleToggleHaptics = async (value: boolean) => {
-    setHapticsOn(value)
-    await setHapticsEnabled(value)
-  }
+    setHapticsOn(value);
+    await setHapticsEnabled(value);
+  };
 
   return (
     <View style={styles.settingsPage}>
@@ -404,18 +368,18 @@ const SettingsContent = ({
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
         <TouchableOpacity
-        style={styles.profileRow}
-        onPress={onEditProfile}
-        activeOpacity={0.85}
+          style={styles.profileRow}
+          onPress={onEditProfile}
+          activeOpacity={0.85}
         >
-          <View style={[styles.profileAvatar, {backgroundColor: selectedAvatar.color}]}>
+          <View style={[styles.profileAvatar, { backgroundColor: selectedAvatar.color }]}>
             <FontAwesome name={selectedAvatar.iconName as any} size={22} color="#FFFFFF" />
           </View>
-          <View style={{flex: 1, marginLeft: spacing.md}}>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
             <Text style={styles.profileName}>{profile?.name ?? "Player"}</Text>
             <Text style={styles.profileHint}>Edit Profile</Text>
           </View>
-          <FontAwesome name="chevron-right" size={16} color={uiTheme.textMuted}/>
+          <FontAwesome name="chevron-right" size={16} color={uiTheme.textMuted} />
         </TouchableOpacity>
 
         <Text style={styles.sectionSubHeader}>Feedback</Text>
@@ -474,12 +438,8 @@ const SettingsContent = ({
                     },
                   ]}
                 >
-                  <View
-                    style={[styles.miniShape, { backgroundColor: theme.shape1Color }]}
-                  />
-                  <View
-                    style={[styles.miniShape, { backgroundColor: theme.shape2Color }]}
-                  />
+                  <View style={[styles.miniShape, { backgroundColor: theme.shape1Color }]} />
+                  <View style={[styles.miniShape, { backgroundColor: theme.shape2Color }]} />
                 </View>
                 <Text style={styles.themeLabel}>{theme.label}</Text>
                 {!unlocked && (
@@ -496,14 +456,14 @@ const SettingsContent = ({
         <View style={styles.toggleCard}>
           <TouchableOpacity style={styles.dangerRow} onPress={onResetChapter}>
             <FontAwesome name="refresh" size={18} color={uiTheme.warning} />
-            <Text style={[styles.dangerLabel, {color: uiTheme.warning}]}>
+            <Text style={[styles.dangerLabel, { color: uiTheme.warning }]}>
               Reset Chapter 1
             </Text>
           </TouchableOpacity>
-          <View style={styles.toggleDivider}/>
+          <View style={styles.toggleDivider} />
           <TouchableOpacity style={styles.dangerRow} onPress={onFullReset}>
-            <FontAwesome name="trash" size={18} color={uiTheme.danger}/>
-            <Text style={[styles.dangerLabel, {color: uiTheme.danger}]}>
+            <FontAwesome name="trash" size={18} color={uiTheme.danger} />
+            <Text style={[styles.dangerLabel, { color: uiTheme.danger }]}>
               Clear All Data
             </Text>
           </TouchableOpacity>
@@ -624,201 +584,165 @@ const makeStyles = (uiTheme: UITheme) =>
       textAlign: "center",
     },
 
-    // Profile dropdown
-    menuOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.25)",
-      justifyContent: "flex-start",
-      alignItems: "flex-end",
-    },
-    profileMenu: {
-      marginTop: 70,
-      marginRight: spacing.xl,
-      backgroundColor: uiTheme.surface,
-      borderRadius: radii.lg,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.xs,
-      width: 200,
-      borderWidth: 1,
-      borderColor: uiTheme.border,
-      ...shadows.md,
-    },
-    menuItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.md,
-    },
-    menuText: {
-      marginLeft: spacing.md,
-      fontSize: 15,
-      fontWeight: "600",
-    },
-    menuDivider: {
-      height: 1,
-      backgroundColor: uiTheme.border,
-      marginHorizontal: spacing.sm,
-    },
-
-    // Settings / How to play sheets
+    // Settings Modal Styles
     settingsPage: {
       flex: 1,
       backgroundColor: uiTheme.background,
-      padding: spacing.xl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
     },
     settingsHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: spacing.xl,
+      marginBottom: spacing.lg,
     },
     settingsTitle: {
-      ...typography.display,
+      ...typography.title,
+      fontSize: 22,
       color: uiTheme.textPrimary,
     },
     doneButton: {
       ...typography.body,
+      fontWeight: "bold",
       color: uiTheme.primary,
-      fontWeight: "700",
+    },
+    profileRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: uiTheme.surface,
+      padding: spacing.md,
+      borderRadius: radii.md,
+      marginBottom: spacing.lg,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+    },
+    profileAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    profileName: {
+      ...typography.title,
+      color: uiTheme.textPrimary,
+    },
+    profileHint: {
+      ...typography.caption,
+      color: uiTheme.textMuted,
     },
     sectionSubHeader: {
       ...typography.micro,
       color: uiTheme.textMuted,
       textTransform: "uppercase",
-      marginBottom: spacing.md,
-    },
-    themeGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
-    },
-    themeCard: {
-      width: "48%",
-      backgroundColor: uiTheme.surface,
-      borderRadius: radii.lg,
-      padding: spacing.md,
-      marginBottom: spacing.md,
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: uiTheme.border,
-    },
-    activeCard: {
-      borderColor: uiTheme.primary,
-      backgroundColor: uiTheme.primarySoft,
-    },
-    previewContainer: {
-      flexDirection: "row",
-      marginBottom: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radii.md,
-      borderWidth: 1.5,
-      gap: spacing.sm,
-    },
-    miniShape: { width: 26, height: 26, borderRadius: 13 },
-    themeLabel: {
-      ...typography.caption,
-      color: uiTheme.textPrimary,
-    },
-    ruleItem: {
-      backgroundColor: uiTheme.surface,
-      padding: spacing.md,
-      borderRadius: radii.md,
-      marginBottom: spacing.md,
-      borderLeftWidth: 4,
-      borderLeftColor: uiTheme.primary,
-    },
-    ruleTitle: {
-      ...typography.title,
-      fontSize: 16,
-      color: uiTheme.textPrimary,
-      marginBottom: 4,
-    },
-    ruleDetail: {
-      ...typography.body,
-      fontSize: 14,
-      color: uiTheme.textMuted,
-      lineHeight: 20,
-    },
-    lockedCard: { opacity: 0.6 },
-    lockOverlay: {
-      position: "absolute",
-      top: 6,
-      right: 6,
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: "rgba(0,0,0,0.55)",
-      justifyContent: "center",
-      alignItems: "center",
+      marginBottom: spacing.xs,
+      marginTop: spacing.md,
     },
     toggleCard: {
       backgroundColor: uiTheme.surface,
       borderRadius: radii.md,
       borderWidth: 1,
       borderColor: uiTheme.border,
-      marginBottom: spacing.xl,
-      ...shadows.sm,
+      overflow: "hidden",
+      marginBottom: spacing.md,
     },
     toggleRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
+      padding: spacing.md,
+    },
+    toggleLabel: {
+      ...typography.body,
+      fontWeight: "600",
+      color: uiTheme.textPrimary,
+    },
+    toggleHint: {
+      ...typography.caption,
+      color: uiTheme.textMuted,
     },
     toggleDivider: {
       height: 1,
       backgroundColor: uiTheme.border,
-      marginHorizontal: spacing.md,
     },
-    toggleLabel: {
-      ...typography.body,
+    themeGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.md,
+      marginBottom: spacing.md,
+    },
+    themeCard: {
+      width: "47%",
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      borderWidth: 2,
+      borderColor: uiTheme.border,
+      alignItems: "center",
+    },
+    activeCard: {
+      borderColor: uiTheme.primary,
+    },
+    lockedCard: {
+      opacity: 0.6,
+    },
+    previewContainer: {
+      width: "100%",
+      height: 44,
+      borderRadius: radii.sm,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      borderWidth: 1,
+      marginBottom: spacing.xs,
+    },
+    miniShape: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+    },
+    themeLabel: {
+      ...typography.caption,
       color: uiTheme.textPrimary,
+      fontWeight: "500",
     },
-    toggleHint: {
-      ...typography.micro,
+    lockOverlay: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      borderRadius: radii.md,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    dangerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: spacing.md,
+      gap: spacing.md,
+    },
+    dangerLabel: {
+      ...typography.body,
+      fontWeight: "600",
+    },
+    ruleItem: {
+      backgroundColor: uiTheme.surface,
+      padding: spacing.md,
+      borderRadius: radii.md,
+      marginBottom: spacing.sm,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+    },
+    ruleTitle: {
+      ...typography.title,
+      fontSize: 16,
+      color: uiTheme.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    ruleDetail: {
+      ...typography.body,
       color: uiTheme.textMuted,
-      marginTop: 2,
     },
-    profileRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  backgroundColor: uiTheme.surface,
-  borderRadius: radii.md,
-  padding: spacing.md,
-  marginBottom: spacing.xl,
-  borderWidth: 1,
-  borderColor: uiTheme.border,
-  ...shadows.sm,
-},
-profileAvatar: {
-  width: 48,
-  height: 48,
-  borderRadius: 24,
-  justifyContent: "center",
-  alignItems: "center",
-  borderWidth: 2,
-  borderColor: uiTheme.surface,
-},
-profileName: {
-  ...typography.title,
-  fontSize: 18,
-  color: uiTheme.textPrimary,
-},
-profileHint: {
-  ...typography.caption,
-  color: uiTheme.textMuted,
-  marginTop: 2,
-},
-dangerRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.md,
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.md,
-},
-dangerLabel: {
-  ...typography.body,
-  fontWeight: "600",
-},
   });

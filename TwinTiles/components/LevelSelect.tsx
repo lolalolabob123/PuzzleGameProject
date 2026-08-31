@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   useWindowDimensions,
-} from 'react-native';
-import { useTheme } from '../context/ThemeContext';
-import { spacing, radii, typography, shadows, UITheme } from '../constants/uiTheme';
+} from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
 
 type LevelItem = {
   id: number;
   stars?: number;
+  isLocked?: boolean;
 };
 
 type LevelSelectProps = {
@@ -30,62 +32,70 @@ type LevelButtonProps = {
 const COLUMNS_PER_ROW = 4;
 const HORIZONTAL_PADDING = spacing.xl;
 const GAP_BETWEEN_COLUMNS = spacing.md;
-const MAX_WEB_CONTAINER_WIDTH = 430; // Matches your WebMobileWrapper maxWidth
+const MAX_WEB_CONTAINER_WIDTH = 430;
 
-const LevelButton = ({ item, onPress, itemSize }: LevelButtonProps) => {
+const LevelButton = memo(({ item, onPress, itemSize }: LevelButtonProps) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const starsEarned = Number(item.stars ?? 0);
-  const displayNumber = item.id ?? '?';
-  const isUnplayed = starsEarned === 0;
+  const displayNumber = item.id ?? "?";
+  const isCompleted = starsEarned > 0;
+  const isLocked = Boolean(item.isLocked);
 
   return (
     <TouchableOpacity
+      disabled={isLocked}
       style={[
         styles.levelButton,
         { width: itemSize, height: itemSize },
-        !isUnplayed && styles.levelButtonCompleted,
+        isCompleted && styles.levelButtonCompleted,
+        isLocked && styles.levelButtonLocked,
       ]}
-      onPress={() => onPress(item)}
-      activeOpacity={0.85}
+      onPress={() => !isLocked && onPress(item)}
+      activeOpacity={isLocked ? 1 : 0.75}
     >
-      <Text style={styles.levelNumber}>{displayNumber}</Text>
-      <View style={styles.starRow}>
-        {[1, 2, 3].map((starPosition) => (
-          <Text
-            key={starPosition}
-            style={[
-              styles.starIcon,
-              {
-                color:
-                  starPosition <= starsEarned
-                    ? uiTheme.star
-                    : uiTheme.surfaceSunken,
-              },
-            ]}
-          >
-            {'\u2605'}
-          </Text>
-        ))}
-      </View>
+      <Text style={[styles.levelNumber, isLocked && styles.levelNumberLocked]}>
+        {isLocked ? (
+          <FontAwesome5 name="lock" size={14} color={uiTheme.textDisabled} />
+        ) : (
+          displayNumber
+        )}
+      </Text>
+
+      {!isLocked && (
+        <View style={styles.starRow}>
+          {[1, 2, 3].map((starPosition) => (
+            <FontAwesome5
+              key={starPosition}
+              name="star"
+              solid={starPosition <= starsEarned}
+              size={10}
+              color={
+                starPosition <= starsEarned
+                  ? uiTheme.star
+                  : uiTheme.surfaceSunken
+              }
+            />
+          ))}
+        </View>
+      )}
     </TouchableOpacity>
   );
-};
+});
 
 export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps) {
   const { ui: uiTheme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
-  // Dynamically calculate tile size based on screen or web frame width
   const itemSize = useMemo(() => {
     const effectiveWidth = Math.min(windowWidth, MAX_WEB_CONTAINER_WIDTH);
     const availableWidth =
       effectiveWidth -
       HORIZONTAL_PADDING * 2 -
       GAP_BETWEEN_COLUMNS * (COLUMNS_PER_ROW - 1);
-      
+
     return Math.floor(availableWidth / COLUMNS_PER_ROW);
   }, [windowWidth]);
 
@@ -107,72 +117,91 @@ export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps)
   }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={levels}
-        extraData={levels}
-        renderItem={({ item }) => (
-          <LevelButton
-            item={item}
-            onPress={onSelectLevel}
-            itemSize={itemSize}
-          />
-        )}
-        keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
-        numColumns={COLUMNS_PER_ROW}
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
-        showsVerticalScrollIndicator={false}
-      />
+    <View style={styles.outerWrapper}>
+      <View style={styles.container}>
+        <FlatList
+          data={levels}
+          extraData={levels}
+          renderItem={({ item }) => (
+            <LevelButton
+              item={item}
+              onPress={onSelectLevel}
+              itemSize={itemSize}
+            />
+          )}
+          keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
+          numColumns={COLUMNS_PER_ROW}
+          contentContainerStyle={styles.listContent}
+          columnWrapperStyle={styles.columnWrapper}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
     </View>
   );
 }
 
-const makeStyles = (uiTheme: UITheme) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: uiTheme.background },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: uiTheme.background,
-  },
-  emptyText: {
-    ...typography.body,
-    marginTop: spacing.md,
-    color: uiTheme.textMuted,
-  },
-  listContent: {
-    paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  columnWrapper: {
-    justifyContent: 'flex-start',
-    gap: GAP_BETWEEN_COLUMNS,
-    marginBottom: GAP_BETWEEN_COLUMNS,
-  },
-  levelButton: {
-    backgroundColor: uiTheme.surfaceMuted,
-    borderRadius: radii.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.sm,
-  },
-  levelButtonCompleted: {
-    backgroundColor: uiTheme.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.border,
-  },
-  levelNumber: {
-    ...typography.title,
-    color: uiTheme.textSecondary,
-  },
-  starRow: {
-    flexDirection: 'row',
-    marginTop: spacing.xs,
-    gap: 2,
-  },
-  starIcon: {
-    fontSize: 10,
-  },
-});
+const makeStyles = (uiTheme: UITheme) =>
+  StyleSheet.create({
+    outerWrapper: {
+      flex: 1,
+      backgroundColor: uiTheme.background,
+      alignItems: "center",
+    },
+    container: {
+      flex: 1,
+      width: "100%",
+      maxWidth: MAX_WEB_CONTAINER_WIDTH,
+      backgroundColor: uiTheme.background,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: uiTheme.background,
+    },
+    emptyText: {
+      ...typography.body,
+      marginTop: spacing.md,
+      color: uiTheme.textMuted,
+    },
+    listContent: {
+      paddingHorizontal: HORIZONTAL_PADDING,
+      paddingTop: spacing.xl,
+      paddingBottom: spacing.xxl,
+    },
+    columnWrapper: {
+      justifyContent: "flex-start",
+      gap: GAP_BETWEEN_COLUMNS,
+      marginBottom: GAP_BETWEEN_COLUMNS,
+    },
+    levelButton: {
+      backgroundColor: uiTheme.surface,
+      borderRadius: radii.md,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      ...shadows.sm,
+    },
+    levelButtonCompleted: {
+      backgroundColor: uiTheme.surfaceMuted,
+      borderColor: uiTheme.primary,
+    },
+    levelButtonLocked: {
+      backgroundColor: uiTheme.surfaceSunken,
+      borderColor: "transparent",
+      opacity: 0.6,
+    },
+    levelNumber: {
+      ...typography.title,
+      color: uiTheme.textPrimary,
+    },
+    levelNumberLocked: {
+      color: uiTheme.textMuted,
+    },
+    starRow: {
+      flexDirection: "row",
+      marginTop: spacing.xs,
+      gap: 3,
+    },
+  });

@@ -441,7 +441,7 @@ const ThemePreviewSheet = ({
                         fontSize: 15,
                         fontWeight: "700",
                         color: isOwned
-                            ? "#FFFFF"
+                            ? "#FFFFFF"
                             : !canAfford
                                 ? uiTheme.textMuted
                                 : uiTheme.onPrimary,
@@ -567,7 +567,6 @@ const makeStyles = (uiTheme: UITheme) =>
         grid: {
             flexDirection: "row",
             flexWrap: "wrap",
-            justifyContent: "space-between",
         },
         card: {
             backgroundColor: uiTheme.surface,

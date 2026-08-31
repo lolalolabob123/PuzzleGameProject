@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {chapters} from '../data/chapters';
+import { chapters } from '../data/chapters';
 
 interface GameProgress {
   [ChapterKey: string]: number;
@@ -28,9 +28,54 @@ const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const getParsed = async <T>(key: string, defaultValue: T): Promise<T> => {
   try {
     const raw = await AsyncStorage.getItem(key);
-    return raw ? JSON.parse(raw): defaultValue;
+    return raw ? JSON.parse(raw) : defaultValue;
   } catch {
     return defaultValue;
+  }
+};
+
+/**
+ * Returns the highest chapter ID the user has unlocked.
+ * A chapter is unlocked if Chapter 1 or if all levels in Chapter (N-1) are solved.
+ */
+export const getHighestUnlockedChapter = async (): Promise<number> => {
+  try {
+    const chapterIds = Object.keys(chapters).map(Number).sort((a, b) => a - b);
+    if (chapterIds.length === 0) return 1;
+
+    let highestUnlocked = chapterIds[0];
+
+    for (let i = 1; i < chapterIds.length; i++) {
+      const prevChapterId = chapterIds[i - 1];
+      const currentChapterId = chapterIds[i];
+
+      const prevProgress = await getChapterProgress(prevChapterId);
+      
+      // If the previous chapter has been fully solved, current chapter unlocks
+      if (prevProgress.total > 0 && prevProgress.solved >= prevProgress.total) {
+        highestUnlocked = currentChapterId;
+      } else {
+        // Stop checking as chapters progress sequentially
+        break;
+      }
+    }
+
+    return highestUnlocked;
+  } catch (error) {
+    console.error("Error computing highest unlocked chapter:", error);
+    return 1;
+  }
+};
+
+/**
+ * Gets the maximum level unlocked for a specific chapter.
+ */
+export const getUnlockedLevel = async (chapterId: number): Promise<number> => {
+  try {
+    const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {});
+    return progress[`chapter_${chapterId}`] || 1;
+  } catch {
+    return 1;
   }
 };
 
@@ -53,7 +98,7 @@ export const getLevelStars = async (chapterId: number, level: number): Promise<n
   try {
     const key = KEYS.stars(chapterId, level);
     const stars = await AsyncStorage.getItem(key);
-    return stars ? parseInt(stars, 10): 0;
+    return stars ? parseInt(stars, 10) : 0;
   } catch {
     return 0;
   }
@@ -71,19 +116,20 @@ export const getAllLevelStars = async (): Promise<Record<string, number>> => {
     if (starKeys.length === 0) return {};
 
     const keyValues = await AsyncStorage.multiGet(starKeys);
-    const result: Record<string, number> ={};
+    const result: Record<string, number> = {};
 
     for (const [key, value] of keyValues) {
       if (value !== null) {
         // e.g., "stars_1_2" -> keyParts: ["stars", "1", "2"]
         const parts = key.split("_");
         if (parts.length === 3) {
-          const formattedKey = `${parts[1]}_${parts[2]}}`;
+          // Fixed extra bracket bug in original code
+          const formattedKey = `${parts[1]}_${parts[2]}`;
           result[formattedKey] = parseInt(value, 10) || 0;
         }
       }
     }
-    return result
+    return result;
   } catch (e) {
     console.error("Failed to batch get all level stars:", e);
     return {};
@@ -93,9 +139,8 @@ export const getAllLevelStars = async (): Promise<Record<string, number>> => {
 export const getChapterProgress = async (chapterId: number) => {
   const levelList = chapters[chapterId]?.levels ?? [];
   const total = levelList.length;
-  if (total === 0) return {solved: 0, total: 0, totalStars: 0, maxStars: 0};
+  if (total === 0) return { solved: 0, total: 0, totalStars: 0, maxStars: 0 };
 
-  // Fetch stars for all levels in this chapter currently
   const starCounts = await Promise.all(
     levelList.map((lvl) => getLevelStars(chapterId, lvl.id))
   );
@@ -108,7 +153,7 @@ export const getChapterProgress = async (chapterId: number) => {
     totalStars += s;
   }
 
-  return {solved, total, totalStars, maxStars: total * 3};
+  return { solved, total, totalStars, maxStars: total * 3 };
 };
 
 export const saveLevelState = async (chapterId: number, levelId: number, state: number[]) => {
@@ -165,16 +210,16 @@ export const resetChapterProgress = async (chapterId: number) => {
 export const clearAllGameData = async () => {
   try {
     const allkeys = await AsyncStorage.getAllKeys();
-    
+
     const gameKeys = allkeys.filter((key) =>
       KEYS.prefixes.some((prefix) => key.startsWith(prefix))
-  );
+    );
 
-  if (gameKeys.length > 0) {
-    await AsyncStorage.multiRemove(gameKeys);
-  }
+    if (gameKeys.length > 0) {
+      await AsyncStorage.multiRemove(gameKeys);
+    }
 
-  await wait(50);
+    await wait(50);
   } catch (e) {
     console.error("Failed to clear all game data", e);
   }

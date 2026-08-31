@@ -1,11 +1,10 @@
 import { NavigatorScreenParams, CompositeScreenProps } from "@react-navigation/native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { NativeStackScreenProps, NativeStackView } from "@react-navigation/native-stack";
-import { BottomTabsScreen } from "react-native-screens";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 export type TabParamList = {
   Home: undefined;
-  Chapters: {themeIndex?: number};
+  Chapters: { themeIndex?: number } | undefined; // Allow undefined for direct tab navigation
   Achievements: undefined;
   Shop: undefined;
 };
@@ -33,6 +32,16 @@ export type HomeScreenProps = CompositeScreenProps<
 
 export type ChapterSelectProps = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, "Chapters">,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+export type AchievementsScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, "Achievements">,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+export type ShopScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<TabParamList, "Shop">,
   NativeStackScreenProps<RootStackParamList>
 >;
 

@@ -15,7 +15,8 @@ export type PaletteName =
   | 'storm'
   | 'sunset'
   | 'forest'
-  | 'neon';
+  | 'neon'
+  | 'cyberpunk';
 
 export type UITheme = {
   name: PaletteName;
@@ -298,6 +299,48 @@ const neon: UITheme = {
   danger: '#FF5577',
 };
 
+// Cyberpunk
+const cyberpunk: UITheme = {
+  name: 'cyberpunk',
+  isDark: true,
+
+  background: '#0F0E17',
+  surface: '#1F1B2E',
+  surfaceMuted: '#2D283E',
+  surfaceSunken: '#14121E',
+
+  primary: '#FF8E3C',
+  primaryDeep: '#D66A1E',
+  primarySoft: '#3D2D20',
+  onPrimary: '#0F0E17',
+
+  textPrimary: '#FFFFFE',
+  textSecondary: '#A7A9BE',
+  textMuted: '#72757E',
+  textDisabled: '#434654',
+
+  border: '#2E2B44',
+  borderStrong: '#FF8E3C',
+  cageBorder: '#FFD803',
+
+  cageTints: [
+    'rgba(255, 142, 60, 0.12)',
+    'rgba(255, 216, 3, 0.10)',
+    'rgba(255, 142, 60, 0.20)',
+    'rgba(255, 216, 3, 0.18)',
+    'rgba(255, 142, 60, 0.08)',
+    'rgba(255, 216, 3, 0.24)',
+  ],
+  chapter: {
+    1: '#72757E',
+    2: '#FFD803',
+    3: '#FF8E3C',
+    4: '#FFFFFE',
+  },
+  ...accents,
+  danger: '#FF5470',
+};
+
 export const uiThemes: Record<PaletteName, UITheme> = {
   classic,
   ink,
@@ -305,7 +348,9 @@ export const uiThemes: Record<PaletteName, UITheme> = {
   sunset,
   forest,
   neon,
+  cyberpunk
 };
+
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 32 };
 export const radii = { sm: 6, md: 12, lg: 16, xl: 24, pill: 999 };

@@ -67,4 +67,13 @@ export const AVAILABLE_THEMES: GameTheme[] = [
     shape1Color: '#FF3CAC',
     shape2Color: '#00E5FF',
   },
+  {
+    id: 'cyberpunk',
+    label: 'Cyberpunk',
+    palette: 'cyberpunk',
+    tileColor: '#1F1B2E',
+    tileEdgeColor: '#0F0E17',
+    shape1Color: '#FF8E3C',
+    shape2Color: '#FFD803',
+  },
 ];
