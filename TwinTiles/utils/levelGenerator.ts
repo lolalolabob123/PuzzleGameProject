@@ -1,17 +1,77 @@
 import seedrandom from "seedrandom";
 
 export interface Cage {
+  id: number;
   indices: number[];
   target?: number;
 }
 
+export type LinkedPair = [number, number];
+
+/**
+ * Validates whether placing a color in a cage respects its target sum.
+ */
+const cagePermits = (
+  grid: number[],
+  index: number,
+  color: number,
+  cages: Cage[]
+): boolean => {
+  if (!cages || cages.length === 0) return true;
+
+  const cage = cages.find((c) => c.indices.includes(index));
+  if (!cage || cage.target === undefined) return true;
+
+  let currentSum = 0;
+  let emptyCount = 0;
+
+  for (const idx of cage.indices) {
+    const val = idx === index ? color : grid[idx];
+    if (val === 0) {
+      emptyCount++;
+    } else if (val > 0) {
+      currentSum += val;
+    }
+  }
+
+  const minPossible = currentSum + emptyCount * 1;
+  const maxPossible = currentSum + emptyCount * 2;
+
+  return cage.target >= minPossible && cage.target <= maxPossible;
+};
+
+/**
+ * Validates whether placing a color in a linked pair cell is permitted.
+ */
+const linkedPermits = (
+  grid: number[],
+  index: number,
+  color: number,
+  size: number,
+  linkedPairs: LinkedPair[]
+): boolean => {
+  if (!linkedPairs || linkedPairs.length === 0) return true;
+
+  for (const [a, b] of linkedPairs) {
+    const other = a === index ? b : b === index ? a : -1;
+    if (other !== -1) {
+      if (grid[other] !== 0 && grid[other] !== color) return false;
+
+      if (grid[other] === 0) {
+        const temp = grid[index];
+        grid[index] = color;
+        const otherValid = isValid(grid, other, color, size);
+        grid[index] = temp;
+        if (!otherValid) return false;
+      }
+    }
+  }
+
+  return true;
+};
+
 /**
  * Validates a local Takuzu placement.
- *
- * Rules:
- * 1. No three identical playable cells consecutively.
- * 2. A void (-1) physically breaks a sequence.
- * 3. A colour cannot exceed half of the playable cells in a row/column.
  */
 const isValid = (
   grid: number[],
@@ -26,17 +86,10 @@ const isValid = (
   const row = Math.floor(index / size);
   const col = index % size;
 
-  /*
-   * HORIZONTAL CONSECUTIVE CHECK
-   */
-  if (
-    col >= 2 &&
-    grid[index - 1] === color &&
-    grid[index - 2] === color
-  ) {
+  /* HORIZONTAL CONSECUTIVE CHECK */
+  if (col >= 2 && grid[index - 1] === color && grid[index - 2] === color) {
     return false;
   }
-
   if (
     col <= size - 3 &&
     grid[index + 1] === color &&
@@ -44,7 +97,6 @@ const isValid = (
   ) {
     return false;
   }
-
   if (
     col >= 1 &&
     col <= size - 2 &&
@@ -54,9 +106,7 @@ const isValid = (
     return false;
   }
 
-  /*
-   * VERTICAL CONSECUTIVE CHECK
-   */
+  /* VERTICAL CONSECUTIVE CHECK */
   if (
     row >= 2 &&
     grid[index - size] === color &&
@@ -64,7 +114,6 @@ const isValid = (
   ) {
     return false;
   }
-
   if (
     row <= size - 3 &&
     grid[index + size] === color &&
@@ -72,7 +121,6 @@ const isValid = (
   ) {
     return false;
   }
-
   if (
     row >= 1 &&
     row <= size - 2 &&
@@ -82,9 +130,7 @@ const isValid = (
     return false;
   }
 
-  /*
-   * COLOUR DISTRIBUTION
-   */
+  /* COLOUR DISTRIBUTION */
   let rowVoids = 0;
   let colVoids = 0;
 
@@ -133,7 +179,14 @@ const hasValidMoves = (grid: number[], size: number): boolean => {
 /**
  * Validates a completed grid.
  */
-const isGridFullyValid = (grid: number[], size: number): boolean => {
+const isGridFullyValid = (
+  grid: number[],
+  size: number,
+  cages: Cage[] = []
+): boolean => {
+  if (!grid || grid.length !== size * size) return false;
+  if (grid.some((val) => val === 0)) return false;
+
   const rowStrings: string[] = [];
   const colStrings: string[] = [];
 
@@ -170,15 +223,30 @@ const isGridFullyValid = (grid: number[], size: number): boolean => {
     colStrings.push(colStr);
   }
 
+  for (const cage of cages) {
+    if (cage.target !== undefined) {
+      const sum = cage.indices.reduce(
+        (acc, idx) => acc + (grid[idx] > 0 ? grid[idx] : 0),
+        0
+      );
+      if (sum !== cage.target) return false;
+    }
+  }
+
   return true;
 };
 
 /**
  * Generates a complete valid grid using backtracking.
  */
-function fillGrid(grid: number[], index: number, size: number, rng: () => number): boolean {
+function fillGrid(
+  grid: number[],
+  index: number,
+  size: number,
+  rng: seedrandom.PRNG
+): boolean {
   if (!grid || !Array.isArray(grid)) {
-    throw new Error('Invalid grid');
+    throw new Error("Invalid grid");
   }
 
   if (index === grid.length) {
@@ -204,32 +272,35 @@ function fillGrid(grid: number[], index: number, size: number, rng: () => number
 }
 
 /**
- * Counts the number of complete solutions up to a limit.
- */
-/**
- * Counts the number of complete solutions up to a limit, honoring both Takuzu rules and cages.
+ * Counts complete solutions, honoring Takuzu, cage, and link constraints.
  */
 const countSolutions = (
   grid: number[],
   index: number,
   size: number,
   cages: Cage[] = [],
+  linkedPairs: LinkedPair[] = [],
   limit: number = 2
 ): number => {
   if (!grid) return 0;
-  if (index === grid.length) return isGridFullyValid(grid, size) ? 1 : 0;
+  if (index === grid.length) return isGridFullyValid(grid, size, cages) ? 1 : 0;
 
   if (grid[index] !== 0) {
-    return countSolutions(grid, index + 1, size, cages, limit);
+    return countSolutions(grid, index + 1, size, cages, linkedPairs, limit);
   }
 
   let total = 0;
   for (const color of [1, 2]) {
     if (!isValid(grid, index, color, size)) continue;
     if (cages.length > 0 && !cagePermits(grid, index, color, cages)) continue;
+    if (
+      linkedPairs.length > 0 &&
+      !linkedPermits(grid, index, color, size, linkedPairs)
+    )
+      continue;
 
     grid[index] = color;
-    total += countSolutions(grid, index + 1, size, cages, limit);
+    total += countSolutions(grid, index + 1, size, cages, linkedPairs, limit);
     grid[index] = 0;
 
     if (total >= limit) return total;
@@ -239,52 +310,17 @@ const countSolutions = (
 };
 
 /**
- * Checks whether a colour can be placed into a cage.
- */
-const cagePermits = (
-  grid: number[],
-  index: number,
-  color: number,
-  cages: Cage[]
-): boolean => {
-  for (const cage of cages) {
-    if (cage.target === undefined || !cage.indices.includes(index)) {
-      continue;
-    }
-
-    let sum = color;
-    let empties = 0;
-
-    for (const idx of cage.indices) {
-      if (idx === index) continue;
-      const v = grid[idx];
-      if (v === 0) empties++;
-      else if (v > 0) sum += v;
-    }
-
-    if (empties === 0) {
-      if (sum !== cage.target) return false;
-    } else {
-      if (sum + empties > cage.target) return false;
-      if (sum + empties * 2 < cage.target) return false;
-    }
-  }
-  return true;
-};
-
-/**
- * Performs one round of logical deductions.
+ * Performs logical deduction passes.
  */
 const deduceOnce = (
   grid: number[],
   size: number,
-  cages: Cage[]
+  cages: Cage[] = [],
+  linkedPairs: LinkedPair[] = []
 ): number => {
   let filled = 0;
 
-  /*
-   * 1. LINE CAPACITY
-   */
+  /* 1. LINE CAPACITY */
   for (let line = 0; line < size; line++) {
     let rowC1 = 0, rowC2 = 0, rowVoids = 0;
     let colC1 = 0, colC2 = 0, colVoids = 0;
@@ -307,6 +343,13 @@ const deduceOnce = (
       for (let i = 0; i < size; i++) {
         const idx = line * size + i;
         if (grid[idx] === 0) {
+          if (
+            !isValid(grid, idx, fillWith, size) ||
+            !cagePermits(grid, idx, fillWith, cages) ||
+            !linkedPermits(grid, idx, fillWith, size, linkedPairs)
+          ) {
+            return -1;
+          }
           grid[idx] = fillWith;
           filled++;
         }
@@ -319,6 +362,13 @@ const deduceOnce = (
       for (let i = 0; i < size; i++) {
         const idx = i * size + line;
         if (grid[idx] === 0) {
+          if (
+            !isValid(grid, idx, fillWith, size) ||
+            !cagePermits(grid, idx, fillWith, cages) ||
+            !linkedPermits(grid, idx, fillWith, size, linkedPairs)
+          ) {
+            return -1;
+          }
           grid[idx] = fillWith;
           filled++;
         }
@@ -326,14 +376,19 @@ const deduceOnce = (
     }
   }
 
-  /*
-   * 2. CELL DEDUCTIONS
-   */
+  /* 2. CELL DEDUCTIONS */
   for (let i = 0; i < grid.length; i++) {
     if (grid[i] !== 0) continue;
 
-    const canBe1 = isValid(grid, i, 1, size) && cagePermits(grid, i, 1, cages);
-    const canBe2 = isValid(grid, i, 2, size) && cagePermits(grid, i, 2, cages);
+    const canBe1 =
+      isValid(grid, i, 1, size) &&
+      cagePermits(grid, i, 1, cages) &&
+      linkedPermits(grid, i, 1, size, linkedPairs);
+
+    const canBe2 =
+      isValid(grid, i, 2, size) &&
+      cagePermits(grid, i, 2, cages) &&
+      linkedPermits(grid, i, 2, size, linkedPairs);
 
     if (!canBe1 && !canBe2) return -1;
 
@@ -342,6 +397,23 @@ const deduceOnce = (
       filled++;
     } else if (canBe2 && !canBe1) {
       grid[i] = 2;
+      filled++;
+    }
+  }
+
+  /* 3. LINKED PAIR PROPAGATION */
+  for (const [a, b] of linkedPairs) {
+    if (grid[a] > 0 && grid[b] === 0) {
+      const val = grid[a];
+      if (!isValid(grid, b, val, size) || !cagePermits(grid, b, val, cages))
+        return -1;
+      grid[b] = val;
+      filled++;
+    } else if (grid[b] > 0 && grid[a] === 0) {
+      const val = grid[b];
+      if (!isValid(grid, a, val, size) || !cagePermits(grid, a, val, cages))
+        return -1;
+      grid[a] = val;
       filled++;
     }
   }
@@ -355,7 +427,8 @@ const deduceOnce = (
 const deduceWithLookahead = (
   grid: number[],
   size: number,
-  cages: Cage[]
+  cages: Cage[] = [],
+  linkedPairs: LinkedPair[] = []
 ): number => {
   let filled = 0;
 
@@ -363,7 +436,11 @@ const deduceWithLookahead = (
     if (grid[i] !== 0) continue;
 
     for (const testColor of [1, 2]) {
-      if (!isValid(grid, i, testColor, size) || !cagePermits(grid, i, testColor, cages)) {
+      if (
+        !isValid(grid, i, testColor, size) ||
+        !cagePermits(grid, i, testColor, cages) ||
+        !linkedPermits(grid, i, testColor, size, linkedPairs)
+      ) {
         continue;
       }
 
@@ -373,16 +450,28 @@ const deduceWithLookahead = (
       let progress = 0;
       let invalid = false;
       do {
-        progress = deduceOnce(testGrid, size, cages);
+        progress = deduceOnce(testGrid, size, cages, linkedPairs);
         if (progress < 0) {
           invalid = true;
           break;
         }
       } while (progress > 0);
 
+      if (
+        !invalid &&
+        !testGrid.includes(0) &&
+        !isGridFullyValid(testGrid, size, cages)
+      ) {
+        invalid = true;
+      }
+
       if (invalid) {
         const oppositeColor = testColor === 1 ? 2 : 1;
-        if (isValid(grid, i, oppositeColor, size) && cagePermits(grid, i, oppositeColor, cages)) {
+        if (
+          isValid(grid, i, oppositeColor, size) &&
+          cagePermits(grid, i, oppositeColor, cages) &&
+          linkedPermits(grid, i, oppositeColor, size, linkedPairs)
+        ) {
           grid[i] = oppositeColor;
           filled++;
           return filled;
@@ -397,32 +486,30 @@ const deduceWithLookahead = (
 };
 
 /**
- * Determines whether a puzzle can be solved using deduction.
+ * Determines whether a puzzle can be solved using logical deduction alone.
  */
 const isSolvableByDeduction = (
   startingGrid: number[],
   size: number,
-  cages: Cage[]
+  cages: Cage[] = [],
+  linkedPairs: LinkedPair[] = []
 ): boolean => {
   const grid = [...startingGrid];
 
   while (grid.some((c) => c === 0)) {
-    let progress = deduceOnce(grid, size, cages);
+    let progress = deduceOnce(grid, size, cages, linkedPairs);
 
     if (progress < 0) return false;
 
     if (progress === 0) {
-      progress = deduceWithLookahead(grid, size, cages);
+      progress = deduceWithLookahead(grid, size, cages, linkedPairs);
       if (progress <= 0) return false;
     }
   }
 
-  return true;
+  return isGridFullyValid(grid, size, cages);
 };
 
-/**
- * Generates a deterministic level.
- */
 export const getFixedLevel = (
   chapterId: number,
   levelId: number,
@@ -441,7 +528,9 @@ export const getFixedLevel = (
   }
 
   if (!fillGrid(fullGrid, 0, size, rng)) {
-    console.error(`Puzzle generation failed for chapter ${chapterId} level ${levelId}`);
+    console.error(
+      `Puzzle generation failed for chapter ${chapterId} level ${levelId}`
+    );
     return new Array(size * size).fill(0);
   }
 
@@ -464,7 +553,8 @@ export const getFixedLevel = (
     puzzle[pos] = 0;
 
     if (
-      !isSolvableByDeduction(puzzle, size, []) ||
+      countSolutions([...puzzle], 0, size, [], [], 2) !== 1 ||
+      !isSolvableByDeduction(puzzle, size, [], []) ||
       !hasValidMoves(puzzle, size)
     ) {
       puzzle[pos] = backup;
@@ -477,8 +567,95 @@ export const getFixedLevel = (
 };
 
 /**
- * Returns the exact completed solution for a level.
+ * Generates Chapter 2 puzzles with linked pairs.
  */
+export const getChapter2Level = (
+  levelId: number,
+  size: number,
+  difficulty: number
+): {
+  grid: number[];
+  linkedPairs: LinkedPair[];
+} => {
+  const seed = `v6-chapter-2-level-${levelId}`;
+  const rng = seedrandom(seed);
+  const solution = new Array(size * size).fill(0);
+
+  if (!fillGrid(solution, 0, size, rng)) {
+    console.error(`Chapter 2 level ${levelId} solution generation failed`);
+    return {
+      grid: new Array(size * size).fill(0),
+      linkedPairs: [],
+    };
+  }
+
+  const candidates: LinkedPair[] = [];
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const idx = r * size + c;
+      if (c < size - 1 && solution[idx] === solution[idx + 1]) {
+        candidates.push([idx, idx + 1]);
+      }
+      if (r < size - 1 && solution[idx] === solution[idx + size]) {
+        candidates.push([idx, idx + size]);
+      }
+    }
+  }
+
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
+  const pairCount = Math.min(5, 2 + Math.floor(levelId / 6));
+  const linkedPairs: LinkedPair[] = [];
+  const usedCells = new Set<number>();
+
+  for (const [a, b] of candidates) {
+    if (linkedPairs.length >= pairCount) break;
+    if (!usedCells.has(a) && !usedCells.has(b)) {
+      linkedPairs.push([a, b]);
+      usedCells.add(a);
+      usedCells.add(b);
+    }
+  }
+
+  const puzzle = [...solution];
+  const positions = Array.from({ length: size * size }, (_, i) => i);
+
+  for (let i = positions.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [positions[i], positions[j]] = [positions[j], positions[i]];
+  }
+
+  const targetRemove = Math.floor(
+    positions.length * Math.min(0.75, difficulty + 0.1)
+  );
+  let removedCount = 0;
+
+  for (const pos of positions) {
+    if (removedCount >= targetRemove) break;
+
+    const backup = puzzle[pos];
+    puzzle[pos] = 0;
+
+    if (
+      countSolutions([...puzzle], 0, size, [], linkedPairs, 2) !== 1 ||
+      !isSolvableByDeduction(puzzle, size, [], linkedPairs) ||
+      !hasValidMoves(puzzle, size)
+    ) {
+      puzzle[pos] = backup;
+    } else {
+      removedCount++;
+    }
+  }
+
+  return {
+    grid: puzzle,
+    linkedPairs,
+  };
+};
+
 export const getFullSolution = (
   chapterId: number,
   levelId: number,
@@ -497,16 +674,15 @@ export const getFullSolution = (
   }
 
   if (!fillGrid(fullGrid, 0, size, rng)) {
-    console.error(`Solution generation failed for chapter ${chapterId} level ${levelId}`);
+    console.error(
+      `Solution generation failed for chapter ${chapterId} level ${levelId}`
+    );
     return new Array(size * size).fill(0);
   }
 
   return fullGrid;
 };
 
-/**
- * Generates deterministic void positions.
- */
 export const getSeededVoids = (
   levelId: number,
   size: number,
@@ -538,12 +714,9 @@ export const getSeededVoids = (
   return voids;
 };
 
-/**
- * Generates connected cage groups.
- */
 const generateCages = (
   size: number,
-  rng: any
+  rng: seedrandom.PRNG
 ): number[][] => {
   const total = size * size;
   const assigned = new Array<number>(total).fill(-1);
@@ -615,9 +788,6 @@ const generateCages = (
   return groups;
 };
 
-/**
- * Chapter 4 cage puzzle generator.
- */
 export const getChapter4Level = (
   levelId: number,
   size: number,
@@ -641,10 +811,11 @@ export const getChapter4Level = (
   const groups = generateCages(size, rng);
   const hideChance = Math.min(0.45, 0.25 + levelId * 0.01);
 
-  const cages: Cage[] = groups.map((g) => {
+  const cages: Cage[] = groups.map((g, idx) => {
     const sum = g.reduce((acc, i) => acc + solution[i], 0);
     const hide = rng() < hideChance;
     return {
+      id: idx,
       indices: g,
       target: hide ? undefined : sum,
     };
@@ -671,7 +842,8 @@ export const getChapter4Level = (
     puzzle[pos] = 0;
 
     if (
-      !isSolvableByDeduction(puzzle, size, cages) ||
+      countSolutions([...puzzle], 0, size, cages, [], 2) !== 1 ||
+      !isSolvableByDeduction(puzzle, size, cages, []) ||
       !hasValidMoves(puzzle, size)
     ) {
       puzzle[pos] = backup;
@@ -686,9 +858,6 @@ export const getChapter4Level = (
   };
 };
 
-/**
- * Assigns cage colours so adjacent cages receive different colours.
- */
 export const colorCages = (
   cages: Cage[],
   size: number,
@@ -753,9 +922,6 @@ export const colorCages = (
   return assigned;
 };
 
-/**
- * Generates the daily puzzle.
- */
 export const getDailyLevel = (
   dateStr: string,
   size: number = 6,
@@ -794,8 +960,8 @@ export const getDailyLevel = (
     puzzle[pos] = 0;
 
     if (
-      countSolutions([...puzzle], 0, size) !== 1 ||
-      !isSolvableByDeduction(puzzle, size, []) ||
+      countSolutions([...puzzle], 0, size, [], [], 2) !== 1 ||
+      !isSolvableByDeduction(puzzle, size, [], []) ||
       !hasValidMoves(puzzle, size)
     ) {
       puzzle[pos] = backup;
