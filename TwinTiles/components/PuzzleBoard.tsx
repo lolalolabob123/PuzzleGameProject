@@ -21,17 +21,6 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TILE_MARGIN = 3;
 
-// Vibrant palette for distinct linked pair color-coding
-const LINK_PALETTE = [
-  "#3B82F6", // Blue
-  "#8B5CF6", // Purple
-  "#EC4899", // Pink
-  "#10B981", // Emerald Green
-  "#F59E0B", // Amber Gold
-  "#06B6D4", // Cyan
-  "#F97316", // Orange
-];
-
 export interface Cage {
   id: number;
   indices: number[];
@@ -46,6 +35,7 @@ export interface CageEdges {
   right: boolean;
   target?: number;
   tint?: string;
+  cageId?: number;
 }
 
 export interface LevelData {
@@ -77,6 +67,7 @@ interface TileProps {
   wrongAnim?: Animated.Value;
   tileSize: number;
   margin: number;
+  gridSize?: number;
   onPress: () => void;
 }
 
@@ -90,92 +81,161 @@ interface WinModalProps {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                        DEEP LINK EXTRACTOR HELPER                          */
+/*                         LINKED PAIR HELPERS                                */
 /* -------------------------------------------------------------------------- */
 
-function extractLinkedColor(levelData: LevelData, index: number): string | undefined {
+function getThemeLinkPalette(uiTheme: UITheme): string[] {
+  return [
+    uiTheme.primary,
+    uiTheme.cageBorder,
+    uiTheme.warning,
+    uiTheme.borderStrong,
+    uiTheme.textSecondary,
+    uiTheme.danger,
+  ];
+}
+
+function getLinkedIndices(levelData: LevelData, index: number): number[] {
+  if (!levelData) return [index];
+
+  const rawLinks = levelData.linkedPairs || levelData.links || levelData.pairs;
+  if (!rawLinks) return [index];
+
+  if (
+    Array.isArray(rawLinks) &&
+    rawLinks.length === levelData.grid?.length &&
+    typeof rawLinks[0] === "number"
+  ) {
+    const groupVal = rawLinks[index];
+    if (groupVal && groupVal > 0) {
+      const matches: number[] = [];
+      rawLinks.forEach((v, i) => {
+        if (v === groupVal) matches.push(i);
+      });
+      return matches;
+    }
+  }
+
+  if (Array.isArray(rawLinks)) {
+    for (const item of rawLinks) {
+      if (!item) continue;
+
+      if (Array.isArray(item)) {
+        if (item.includes(index)) {
+          return item.filter((v) => typeof v === "number");
+        }
+      }
+
+      if (typeof item === "object") {
+        const arrProp =
+          item.indices ||
+          item.cells ||
+          item.pair ||
+          item.nodes ||
+          item.group ||
+          item.link;
+
+        if (Array.isArray(arrProp) && arrProp.includes(index)) {
+          return arrProp.filter((v) => typeof v === "number");
+        }
+
+        const p1 =
+          item.cell1 ??
+          item.c1 ??
+          item.index1 ??
+          item.idx1 ??
+          item.a ??
+          item.p1 ??
+          item.pos1 ??
+          item.from ??
+          item.first;
+        const p2 =
+          item.cell2 ??
+          item.c2 ??
+          item.index2 ??
+          item.idx2 ??
+          item.b ??
+          item.p2 ??
+          item.pos2 ??
+          item.to ??
+          item.second;
+
+        if (p1 === index || p2 === index) {
+          const res: number[] = [];
+          if (typeof p1 === "number") res.push(p1);
+          if (typeof p2 === "number") res.push(p2);
+          return res;
+        }
+      }
+    }
+  }
+
+  return [index];
+}
+
+function extractLinkedColor(
+  levelData: LevelData,
+  index: number,
+  uiTheme: UITheme
+): string | undefined {
   if (!levelData) return undefined;
 
-  const knownNonLinkKeys = new Set([
-    "grid",
-    "cages",
-    "voids",
-    "id",
-    "size",
-    "chapterId",
-    "level",
-  ]);
+  const rawLinks = levelData.linkedPairs || levelData.links || levelData.pairs;
+  if (!rawLinks) return undefined;
 
-  const candidates: any[] = [];
-  Object.keys(levelData).forEach((key) => {
-    if (!knownNonLinkKeys.has(key) && levelData[key] != null) {
-      candidates.push(levelData[key]);
-    }
-  });
+  const palette = getThemeLinkPalette(uiTheme);
 
-  for (let c = 0; c < candidates.length; c++) {
-    const source = candidates[c];
-    if (!source) continue;
-
-    // 1. Handle arrays
-    if (Array.isArray(source)) {
-      if (source.length === 0) continue;
-
-      // Flat array matching grid length e.g. [1, 1, 0, 0, 2, 2]
-      if (
-        source.length === levelData.grid?.length &&
-        typeof source[0] === "number"
-      ) {
-        const groupVal = source[index];
-        if (groupVal && groupVal > 0) {
-          return LINK_PALETTE[(groupVal - 1) % LINK_PALETTE.length];
-        }
-      }
-
-      for (let i = 0; i < source.length; i++) {
-        const item = source[i];
-        if (!item) continue;
-
-        // Nested index array e.g. [0, 1] or [4, 5]
-        if (Array.isArray(item)) {
-          if (item.includes(index)) {
-            return LINK_PALETTE[i % LINK_PALETTE.length];
-          }
-        }
-        // Object entry e.g. { indices: [0, 1] }, { pair: [0, 1] }, { a: 0, b: 1 }
-        else if (typeof item === "object") {
-          const idxs =
-            item.indices ||
-            item.pair ||
-            item.cells ||
-            item.nodes ||
-            item.pairIndices ||
-            item.group;
-
-          if (Array.isArray(idxs) && idxs.includes(index)) {
-            return item.color || LINK_PALETTE[i % LINK_PALETTE.length];
-          }
-
-          const p1 = item.a ?? item.cell1 ?? item.index1 ?? item.from ?? item.first;
-          const p2 = item.b ?? item.cell2 ?? item.index2 ?? item.to ?? item.second;
-          if (p1 === index || p2 === index) {
-            return item.color || LINK_PALETTE[i % LINK_PALETTE.length];
-          }
-        }
+  if (Array.isArray(rawLinks)) {
+    if (
+      rawLinks.length === levelData.grid?.length &&
+      typeof rawLinks[0] === "number"
+    ) {
+      const groupVal = rawLinks[index];
+      if (groupVal && groupVal > 0) {
+        return palette[(groupVal - 1) % palette.length];
       }
     }
-    // 2. Handle map objects e.g. { "0": 1, "1": 1 }
-    else if (typeof source === "object") {
-      const val = source[index] ?? source[`${index}`];
-      if (val !== undefined && val !== null && val !== false) {
-        if (typeof val === "string" && val.startsWith("#")) return val;
-        if (Array.isArray(val) && val.length > 0) {
-          return LINK_PALETTE[0];
-        }
-        const numVal = typeof val === "number" ? val : parseInt(val, 10);
-        if (!isNaN(numVal) && numVal > 0) {
-          return LINK_PALETTE[(numVal - 1) % LINK_PALETTE.length];
-        }
+
+    for (let i = 0; i < rawLinks.length; i++) {
+      const item = rawLinks[i];
+      if (!item) continue;
+
+      const color = palette[i % palette.length];
+
+      if (Array.isArray(item)) {
+        if (item.includes(index)) return color;
+      } else if (typeof item === "object") {
+        const arrProp =
+          item.indices ||
+          item.cells ||
+          item.pair ||
+          item.nodes ||
+          item.group ||
+          item.link;
+        if (Array.isArray(arrProp) && arrProp.includes(index)) return color;
+
+        const p1 =
+          item.cell1 ??
+          item.c1 ??
+          item.index1 ??
+          item.idx1 ??
+          item.a ??
+          item.p1 ??
+          item.pos1 ??
+          item.from ??
+          item.first;
+        const p2 =
+          item.cell2 ??
+          item.c2 ??
+          item.index2 ??
+          item.idx2 ??
+          item.b ??
+          item.p2 ??
+          item.pos2 ??
+          item.to ??
+          item.second;
+
+        if (p1 === index || p2 === index) return color;
       }
     }
   }
@@ -196,14 +256,29 @@ export const Tile: React.FC<TileProps> = ({
   wrongAnim,
   tileSize,
   margin,
+  gridSize,
   onPress,
 }) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
-  const cageBorderThickness = 3;
+
+  const isDenseGrid = (gridSize && gridSize >= 8) || tileSize < 42;
+  const cageBorderThickness = isDenseGrid ? 2 : 3;
+  const cageTargetFontSize = isDenseGrid ? 9 : 11;
+
+  const activeCageColor = uiTheme.cageBorder || uiTheme.primary;
 
   const getEmptyBackground = () => {
-    if (cageEdges?.tint) return { backgroundColor: cageEdges.tint };
+    if (cageEdges) {
+      const cageIdx = cageEdges.cageId ?? 0;
+      if (uiTheme.cageTints && uiTheme.cageTints.length > 0) {
+        return {
+          backgroundColor:
+            uiTheme.cageTints[cageIdx % uiTheme.cageTints.length],
+        };
+      }
+      return { backgroundColor: `${activeCageColor}18` };
+    }
     if (linkedColor && val === 0) return { backgroundColor: `${linkedColor}1F` };
     return styles.tileEmpty;
   };
@@ -233,7 +308,6 @@ export const Tile: React.FC<TileProps> = ({
           },
         ]}
       >
-        {/* Linked Pair Border Highlight */}
         {linkedColor && (
           <View
             pointerEvents="none"
@@ -244,25 +318,42 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Cage Border Overlay */}
         {cageEdges && (
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFillObject,
-              styles.cageOverlay,
-              {
-                borderTopWidth: cageEdges.top ? cageBorderThickness : 0,
-                borderBottomWidth: cageEdges.bottom ? cageBorderThickness : 0,
-                borderLeftWidth: cageEdges.left ? cageBorderThickness : 0,
-                borderRightWidth: cageEdges.right ? cageBorderThickness : 0,
-                borderColor: uiTheme.cageBorder || "#F59E0B",
-              },
-            ]}
-          />
+          <>
+            {/* Dark Contrast Halo Underlay */}
+            <View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                styles.cageOverlay,
+                {
+                  borderTopWidth: cageEdges.top ? cageBorderThickness + 2 : 0,
+                  borderBottomWidth: cageEdges.bottom ? cageBorderThickness + 2 : 0,
+                  borderLeftWidth: cageEdges.left ? cageBorderThickness + 2 : 0,
+                  borderRightWidth: cageEdges.right ? cageBorderThickness + 2 : 0,
+                  borderColor: "rgba(0, 0, 0, 0.45)",
+                },
+              ]}
+            />
+
+            {/* Primary Theme-Aware Cage Border */}
+            <View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                styles.cageOverlay,
+                {
+                  borderTopWidth: cageEdges.top ? cageBorderThickness : 0,
+                  borderBottomWidth: cageEdges.bottom ? cageBorderThickness : 0,
+                  borderLeftWidth: cageEdges.left ? cageBorderThickness : 0,
+                  borderRightWidth: cageEdges.right ? cageBorderThickness : 0,
+                  borderColor: activeCageColor,
+                },
+              ]}
+            />
+          </>
         )}
 
-        {/* Linked Badge Overlay */}
         {linkedColor && (
           <View
             pointerEvents="none"
@@ -275,14 +366,22 @@ export const Tile: React.FC<TileProps> = ({
           </View>
         )}
 
-        {/* Cage Target Badge */}
         {cageEdges?.target !== undefined && (
           <View style={styles.cageTargetBadge}>
-            <Text style={styles.cageTargetText}>{cageEdges.target}</Text>
+            <Text
+              style={[
+                styles.cageTargetText,
+                {
+                  fontSize: cageTargetFontSize,
+                  lineHeight: cageTargetFontSize + 1,
+                },
+              ]}
+            >
+              {cageEdges.target}
+            </Text>
           </View>
         )}
 
-        {/* Tile Value */}
         {val !== 0 && (
           <Text
             style={[
@@ -391,6 +490,7 @@ export default function PuzzleBoard({
     setGrid([...levelData.grid]);
     setMoves(0);
     setIsWon(false);
+    console.log("RAW LEVEL DATA CAGES:", JSON.stringify(levelData.cages, null, 2));
   }, [levelData, forcedReset]);
 
   const isFixedIndex = useCallback(
@@ -439,14 +539,35 @@ export default function PuzzleBoard({
       }
     }
 
+    for (let i = 0; i < currentGrid.length; i++) {
+      if (isVoidIndex(i)) continue;
+      const linked = getLinkedIndices(levelData, i);
+      if (linked.length > 1) {
+        const val = currentGrid[i];
+        for (const partnerIdx of linked) {
+          if (!isVoidIndex(partnerIdx) && currentGrid[partnerIdx] !== val) {
+            return false;
+          }
+        }
+      }
+    }
+
     return true;
   };
 
   const handleTilePress = (index: number) => {
     if (isFixedIndex(index) || isVoidIndex(index) || isWon) return;
 
+    const nextVal = (grid[index] + 1) % 3;
+    const linkedIndices = getLinkedIndices(levelData, index);
+
     const nextGrid = [...grid];
-    nextGrid[index] = (nextGrid[index] + 1) % 3;
+    linkedIndices.forEach((idx) => {
+      if (!isVoidIndex(idx) && !isFixedIndex(idx)) {
+        nextGrid[idx] = nextVal;
+      }
+    });
+
     setGrid(nextGrid);
     const newMoves = moves + 1;
     setMoves(newMoves);
@@ -468,9 +589,12 @@ export default function PuzzleBoard({
 
   const getCageEdgesForIndex = (index: number): CageEdges | null => {
     if (!levelData.cages) return null;
-    const cage = levelData.cages.find((c) => c.indices.includes(index));
-    if (!cage) return null;
+    const cageIndex = levelData.cages.findIndex((c) =>
+      c.indices.includes(index)
+    );
+    if (cageIndex === -1) return null;
 
+    const cage = levelData.cages[cageIndex];
     const row = Math.floor(index / size);
     const col = index % size;
     const isTop = row === 0 || !cage.indices.includes((row - 1) * size + col);
@@ -488,7 +612,7 @@ export default function PuzzleBoard({
       left: isLeft,
       right: isRight,
       target: isFirstInCage ? cage.target : undefined,
-      tint: cage.tint,
+      cageId: cageIndex,
     };
   };
 
@@ -529,11 +653,12 @@ export default function PuzzleBoard({
                     key={idx}
                     val={val}
                     isFixed={isFixedIndex(idx)}
-                    linkedColor={extractLinkedColor(levelData, idx)}
+                    linkedColor={extractLinkedColor(levelData, idx, uiTheme)}
                     cageEdges={getCageEdgesForIndex(idx)}
                     wrongAnim={wrongAnim}
                     tileSize={tileSize}
                     margin={TILE_MARGIN}
+                    gridSize={size}
                     onPress={() => handleTilePress(idx)}
                   />
                 );
@@ -644,14 +769,16 @@ const makeStyles = (uiTheme: UITheme) =>
     cageTargetBadge: {
       position: "absolute",
       top: 2,
-      left: 4,
+      left: 2,
       zIndex: 10,
+      backgroundColor: "rgba(0, 0, 0, 0.45)",
+      paddingHorizontal: 3,
+      paddingVertical: 1,
+      borderRadius: 3,
     },
     cageTargetText: {
-      ...typography.micro,
-      fontSize: 10,
-      fontWeight: "700",
-      color: uiTheme.textMuted || "#A1A1AA",
+      fontWeight: "800",
+      color: "#FFFFFF",
     },
     linkedBorderOverlay: {
       ...StyleSheet.absoluteFillObject,

@@ -54,7 +54,7 @@ export default function GameScreen({
    * ---------------------------------------------------------
    */
   const levelData: LevelData = useMemo(() => {
-    // Daily Puzzle
+    // 1. Daily Puzzle
     if (daily) {
       const dateKey = todayKey();
       const { grid, size } = getDailyLevel(dateKey);
@@ -65,19 +65,26 @@ export default function GameScreen({
       };
     }
 
-    const size = 6;
+    // 2. Read configured size from chapter config (defaults to 6 if unspecified)
+    const chapterConfig = chapters[chapterId];
+    const levelConfig = chapterConfig?.levels?.find((l) => l.id === levelId);
+    const configuredSize = levelConfig?.size ?? 6;
+
     const difficulty = 0.55;
 
     // Chapter 2: Linked Pairs
     if (chapterId === 2) {
       const { grid, linkedPairs } = getChapter2Level(
         levelId,
-        size,
+        configuredSize,
         difficulty
       );
+      const actualSize =
+        grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
+
       return {
         id: levelId,
-        size,
+        size: actualSize,
         grid,
         linkedPairs,
       };
@@ -87,12 +94,15 @@ export default function GameScreen({
     if (chapterId === 4) {
       const { grid, cages } = getChapter4Level(
         levelId,
-        size,
+        configuredSize,
         difficulty
       );
+      const actualSize =
+        grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
+
       return {
         id: levelId,
-        size,
+        size: actualSize,
         grid,
         cages,
       };
@@ -101,20 +111,23 @@ export default function GameScreen({
     // Chapter 3: Void cells / Chapter 1: Standard Takuzu
     const voids =
       chapterId === 3
-        ? getSeededVoids(levelId, size, 2)
+        ? getSeededVoids(levelId, configuredSize, 2)
         : [];
 
     const grid = getFixedLevel(
       chapterId,
       levelId,
-      size,
+      configuredSize,
       difficulty,
       voids
     );
 
+    const actualSize =
+      grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
+
     return {
       id: levelId,
-      size,
+      size: actualSize,
       grid,
       voids,
     };
@@ -141,7 +154,6 @@ export default function GameScreen({
       (l) => l.id === levelId
     );
 
-    // 1. Advance to next level within the current chapter
     if (
       currentIndex !== -1 &&
       currentIndex < currentChapter.levels.length - 1
@@ -157,7 +169,6 @@ export default function GameScreen({
       return;
     }
 
-    // 2. End of Chapter: Advance to the first level of the next chapter
     const nextChapterId = chapterId + 1;
     const nextChapter = chapters[nextChapterId];
 
@@ -171,16 +182,10 @@ export default function GameScreen({
         themeIndex: themeIndex ?? 0,
       });
     } else {
-      // No more chapters remaining
       navigation.goBack();
     }
   }, [daily, chapterId, levelId, navigation, themeIndex]);
 
-  /*
-   * ---------------------------------------------------------
-   * ERROR STATE
-   * ---------------------------------------------------------
-   */
   if (!levelData) {
     return (
       <ErrorState
@@ -231,11 +236,6 @@ export default function GameScreen({
   );
 }
 
-/*
- * -----------------------------------------------------------
- * ERROR STATE COMPONENT
- * -----------------------------------------------------------
- */
 const ErrorState = ({
   levelId,
   onBack,
@@ -269,11 +269,6 @@ const ErrorState = ({
   );
 };
 
-/*
- * -----------------------------------------------------------
- * STYLES
- * -----------------------------------------------------------
- */
 const makeStyles = (uiTheme: UITheme, topInset: number) =>
   StyleSheet.create({
     container: {
