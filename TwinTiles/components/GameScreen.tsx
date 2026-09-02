@@ -1,22 +1,13 @@
 import React, { useMemo, useCallback } from "react";
 import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 
 import { GameScreenProps } from "../navigation/types";
 import PuzzleBoard, { LevelData } from "../components/PuzzleBoard";
 import { chapters } from "../data/chapters";
 import { useTheme } from "../context/ThemeContext";
-import {
-  spacing,
-  radii,
-  typography,
-  shadows,
-  UITheme,
-} from "../constants/uiTheme";
+import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
 
 import {
   getDailyLevel,
@@ -28,10 +19,7 @@ import {
 
 import { todayKey } from "../utils/daily";
 
-export default function GameScreen({
-  route,
-  navigation,
-}: GameScreenProps) {
+export default function GameScreen({ route, navigation }: GameScreenProps) {
   const {
     levelId = 1,
     chapterId = 1,
@@ -41,103 +29,38 @@ export default function GameScreen({
   } = route.params || {};
 
   const { ui: uiTheme } = useTheme();
-  const insets = useSafeAreaInsets();
 
-  const styles = useMemo(
-    () => makeStyles(uiTheme, insets.top),
-    [uiTheme, insets.top]
-  );
-
-  /*
-   * ---------------------------------------------------------
-   * LEVEL DATA GENERATION
-   * ---------------------------------------------------------
-   */
   const levelData: LevelData = useMemo(() => {
-    // 1. Daily Puzzle
     if (daily) {
       const dateKey = todayKey();
       const { grid, size } = getDailyLevel(dateKey);
-      return {
-        id: 0,
-        size,
-        grid,
-      };
+      return { id: 0, size, grid };
     }
 
-    // 2. Read configured size from chapter config (defaults to 6 if unspecified)
     const chapterConfig = chapters[chapterId];
     const levelConfig = chapterConfig?.levels?.find((l) => l.id === levelId);
     const configuredSize = levelConfig?.size ?? 6;
-
     const difficulty = 0.55;
 
-    // Chapter 2: Linked Pairs
     if (chapterId === 2) {
-      const { grid, linkedPairs } = getChapter2Level(
-        levelId,
-        configuredSize,
-        difficulty
-      );
-      const actualSize =
-        grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
-
-      return {
-        id: levelId,
-        size: actualSize,
-        grid,
-        linkedPairs,
-      };
+      const { grid, linkedPairs } = getChapter2Level(levelId, configuredSize, difficulty);
+      const actualSize = grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
+      return { id: levelId, size: actualSize, grid, linkedPairs };
     }
 
-    // Chapter 4: Cages
     if (chapterId === 4) {
-      const { grid, cages } = getChapter4Level(
-        levelId,
-        configuredSize,
-        difficulty
-      );
-      const actualSize =
-        grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
-
-      return {
-        id: levelId,
-        size: actualSize,
-        grid,
-        cages,
-      };
+      const { grid, cages } = getChapter4Level(levelId, configuredSize, difficulty);
+      const actualSize = grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
+      return { id: levelId, size: actualSize, grid, cages };
     }
 
-    // Chapter 3: Void cells / Chapter 1: Standard Takuzu
-    const voids =
-      chapterId === 3
-        ? getSeededVoids(levelId, configuredSize, 2)
-        : [];
+    const voids = chapterId === 3 ? getSeededVoids(levelId, configuredSize, 2) : [];
+    const grid = getFixedLevel(chapterId, levelId, configuredSize, difficulty, voids);
+    const actualSize = grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
 
-    const grid = getFixedLevel(
-      chapterId,
-      levelId,
-      configuredSize,
-      difficulty,
-      voids
-    );
-
-    const actualSize =
-      grid && grid.length > 0 ? Math.sqrt(grid.length) : configuredSize;
-
-    return {
-      id: levelId,
-      size: actualSize,
-      grid,
-      voids,
-    };
+    return { id: levelId, size: actualSize, grid, voids };
   }, [chapterId, levelId, daily]);
 
-  /*
-   * ---------------------------------------------------------
-   * NEXT LEVEL / CHAPTER PROGRESSION
-   * ---------------------------------------------------------
-   */
   const handleNextLevel = useCallback(() => {
     if (daily) {
       navigation.goBack();
@@ -150,14 +73,9 @@ export default function GameScreen({
       return;
     }
 
-    const currentIndex = currentChapter.levels.findIndex(
-      (l) => l.id === levelId
-    );
+    const currentIndex = currentChapter.levels.findIndex((l) => l.id === levelId);
 
-    if (
-      currentIndex !== -1 &&
-      currentIndex < currentChapter.levels.length - 1
-    ) {
+    if (currentIndex !== -1 && currentIndex < currentChapter.levels.length - 1) {
       const nextLevel = currentChapter.levels[currentIndex + 1];
 
       navigation.replace("Game", {
@@ -187,12 +105,7 @@ export default function GameScreen({
   }, [daily, chapterId, levelId, navigation, themeIndex]);
 
   if (!levelData) {
-    return (
-      <ErrorState
-        levelId={levelId}
-        onBack={() => navigation.goBack()}
-      />
-    );
+    return <ErrorState levelId={levelId} onBack={() => navigation.goBack()} />;
   }
 
   const boardKey = daily
@@ -200,124 +113,95 @@ export default function GameScreen({
     : `board-${chapterId}-${levelId}`;
 
   return (
-    <SafeAreaView
-      style={styles.container}
-      edges={["top", "bottom"]}
-    >
-      <TouchableOpacity
-        style={styles.backFab}
-        onPress={() => navigation.goBack()}
-        activeOpacity={0.8}
-        hitSlop={{
-          top: 10,
-          bottom: 10,
-          left: 10,
-          right: 10,
-        }}
-      >
-        <FontAwesome
-          name="chevron-left"
-          size={14}
-          color={uiTheme.textPrimary}
-        />
-      </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { backgroundColor: uiTheme.background }]} edges={["top", "bottom"]}>
+      {/* Fixed Navigation Header Bar */}
+      <View style={[styles.headerBar, { borderColor: uiTheme.border }]}>
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: uiTheme.surface, borderColor: uiTheme.border }]}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <FontAwesome name="chevron-left" size={14} color={uiTheme.textPrimary} />
+        </TouchableOpacity>
 
-      <PuzzleBoard
-        key={boardKey}
-        levelData={levelData}
-        chapterId={chapterId}
-        level={levelId}
-        size={levelData.size}
-        onNextLevel={handleNextLevel}
-        forcedReset={forcedReset}
-        daily={daily}
-      />
+        <Text style={[styles.headerTitle, { color: uiTheme.textPrimary }]}>
+          {daily ? "Daily Challenge" : `Chapter ${chapterId} • Level ${levelId}`}
+        </Text>
+
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={styles.boardContainer}>
+        <PuzzleBoard
+          key={boardKey}
+          levelData={levelData}
+          chapterId={chapterId}
+          level={levelId}
+          size={levelData.size}
+          onNextLevel={handleNextLevel}
+          forcedReset={forcedReset}
+          daily={daily}
+        />
+      </View>
     </SafeAreaView>
   );
 }
 
-const ErrorState = ({
-  levelId,
-  onBack,
-}: {
-  levelId: number;
-  onBack: () => void;
-}) => {
+const ErrorState = ({ levelId, onBack }: { levelId: number; onBack: () => void }) => {
   const { ui: uiTheme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => makeStyles(uiTheme, insets.top),
-    [uiTheme, insets.top]
-  );
-
   return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorText}>Level {levelId} not found!</Text>
-
-      <Text style={styles.errorSubtext}>
-        This level might not be added to your chapter data yet.
-      </Text>
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={onBack}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.backButtonText}>Go Back</Text>
+    <View style={[styles.errorContainer, { backgroundColor: uiTheme.background }]}>
+      <Text style={[styles.errorText, { color: uiTheme.danger }]}>Level {levelId} not found!</Text>
+      <TouchableOpacity style={[styles.backButton, { backgroundColor: uiTheme.primary }]} onPress={onBack}>
+        <Text style={{ color: uiTheme.onPrimary, fontWeight: "bold" }}>Go Back</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-const makeStyles = (uiTheme: UITheme, topInset: number) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: uiTheme.background,
-    },
-    errorContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: spacing.xl,
-      backgroundColor: uiTheme.background,
-    },
-    errorText: {
-      ...typography.title,
-      fontSize: 22,
-      color: uiTheme.danger,
-    },
-    errorSubtext: {
-      ...typography.body,
-      color: uiTheme.textMuted,
-      textAlign: "center",
-      marginVertical: spacing.sm + 2,
-    },
-    backButton: {
-      marginTop: spacing.xl,
-      paddingHorizontal: spacing.xxl - 8,
-      paddingVertical: spacing.md,
-      backgroundColor: uiTheme.primary,
-      borderRadius: radii.md,
-      ...shadows.sm,
-    },
-    backButtonText: {
-      color: uiTheme.onPrimary,
-      fontWeight: "bold",
-    },
-    backFab: {
-      position: "absolute",
-      top: topInset + spacing.xs,
-      left: spacing.md,
-      zIndex: 10,
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: uiTheme.surface,
-      justifyContent: "center",
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: uiTheme.border,
-      ...shadows.sm,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  headerBar: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    ...typography.title,
+    fontSize: 16,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    ...shadows.sm,
+  },
+  boardContainer: {
+    flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.xl,
+  },
+  errorText: {
+    ...typography.title,
+    fontSize: 22,
+  },
+  backButton: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+  },
+});

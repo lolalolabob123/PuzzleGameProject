@@ -1,50 +1,30 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  Animated,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
+import { View, Text, TouchableOpacity, Modal, Animated, StyleSheet, Dimensions } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics"; // Optional: gracefully falls back if not installed
 import { useTheme } from "../context/ThemeContext";
+import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
 import {
-  spacing,
-  radii,
-  typography,
-  shadows,
-  UITheme,
-} from "../constants/uiTheme";
+  getLevelState,
+  getActiveSession,
+  saveActiveSession,
+  clearActiveSession,
+  unlockNextLevel,
+  saveLevelStars,
+} from "../utils/progress";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const TILE_MARGIN = 3;
-
-export interface Cage {
-  id: number;
-  indices: number[];
-  target?: number;
-  tint?: string;
-}
-
-export interface CageEdges {
-  top: boolean;
-  bottom: boolean;
-  left: boolean;
-  right: boolean;
-  target?: number;
-  tint?: string;
-  cageId?: number;
-}
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const TILE_MARGIN = 2;
 
 export interface LevelData {
   id: number;
   size: number;
   grid: number[];
-  cages?: Cage[];
+  cages?: any[];
   voids?: number[];
   linkedPairs?: any[];
+  par?: number;
+  minMoves?: number;
   [key: string]: any;
 }
 
@@ -58,407 +38,6 @@ interface PuzzleBoardProps {
   daily?: boolean;
 }
 
-interface TileProps {
-  val: number;
-  isFixed: boolean;
-  linkedColor?: string;
-  cageEdges?: CageEdges | null;
-  isWrong?: boolean;
-  wrongAnim?: Animated.Value;
-  tileSize: number;
-  margin: number;
-  gridSize?: number;
-  onPress: () => void;
-}
-
-interface WinModalProps {
-  visible: boolean;
-  starAnims: Animated.Value[];
-  starCount: number;
-  previousStars: number;
-  moves: number;
-  onNext: () => void;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                         LINKED PAIR HELPERS                                */
-/* -------------------------------------------------------------------------- */
-
-function getThemeLinkPalette(uiTheme: UITheme): string[] {
-  return [
-    uiTheme.primary,
-    uiTheme.cageBorder,
-    uiTheme.warning,
-    uiTheme.borderStrong,
-    uiTheme.textSecondary,
-    uiTheme.danger,
-  ];
-}
-
-function getLinkedIndices(levelData: LevelData, index: number): number[] {
-  if (!levelData) return [index];
-
-  const rawLinks = levelData.linkedPairs || levelData.links || levelData.pairs;
-  if (!rawLinks) return [index];
-
-  if (
-    Array.isArray(rawLinks) &&
-    rawLinks.length === levelData.grid?.length &&
-    typeof rawLinks[0] === "number"
-  ) {
-    const groupVal = rawLinks[index];
-    if (groupVal && groupVal > 0) {
-      const matches: number[] = [];
-      rawLinks.forEach((v, i) => {
-        if (v === groupVal) matches.push(i);
-      });
-      return matches;
-    }
-  }
-
-  if (Array.isArray(rawLinks)) {
-    for (const item of rawLinks) {
-      if (!item) continue;
-
-      if (Array.isArray(item)) {
-        if (item.includes(index)) {
-          return item.filter((v) => typeof v === "number");
-        }
-      }
-
-      if (typeof item === "object") {
-        const arrProp =
-          item.indices ||
-          item.cells ||
-          item.pair ||
-          item.nodes ||
-          item.group ||
-          item.link;
-
-        if (Array.isArray(arrProp) && arrProp.includes(index)) {
-          return arrProp.filter((v) => typeof v === "number");
-        }
-
-        const p1 =
-          item.cell1 ??
-          item.c1 ??
-          item.index1 ??
-          item.idx1 ??
-          item.a ??
-          item.p1 ??
-          item.pos1 ??
-          item.from ??
-          item.first;
-        const p2 =
-          item.cell2 ??
-          item.c2 ??
-          item.index2 ??
-          item.idx2 ??
-          item.b ??
-          item.p2 ??
-          item.pos2 ??
-          item.to ??
-          item.second;
-
-        if (p1 === index || p2 === index) {
-          const res: number[] = [];
-          if (typeof p1 === "number") res.push(p1);
-          if (typeof p2 === "number") res.push(p2);
-          return res;
-        }
-      }
-    }
-  }
-
-  return [index];
-}
-
-function extractLinkedColor(
-  levelData: LevelData,
-  index: number,
-  uiTheme: UITheme
-): string | undefined {
-  if (!levelData) return undefined;
-
-  const rawLinks = levelData.linkedPairs || levelData.links || levelData.pairs;
-  if (!rawLinks) return undefined;
-
-  const palette = getThemeLinkPalette(uiTheme);
-
-  if (Array.isArray(rawLinks)) {
-    if (
-      rawLinks.length === levelData.grid?.length &&
-      typeof rawLinks[0] === "number"
-    ) {
-      const groupVal = rawLinks[index];
-      if (groupVal && groupVal > 0) {
-        return palette[(groupVal - 1) % palette.length];
-      }
-    }
-
-    for (let i = 0; i < rawLinks.length; i++) {
-      const item = rawLinks[i];
-      if (!item) continue;
-
-      const color = palette[i % palette.length];
-
-      if (Array.isArray(item)) {
-        if (item.includes(index)) return color;
-      } else if (typeof item === "object") {
-        const arrProp =
-          item.indices ||
-          item.cells ||
-          item.pair ||
-          item.nodes ||
-          item.group ||
-          item.link;
-        if (Array.isArray(arrProp) && arrProp.includes(index)) return color;
-
-        const p1 =
-          item.cell1 ??
-          item.c1 ??
-          item.index1 ??
-          item.idx1 ??
-          item.a ??
-          item.p1 ??
-          item.pos1 ??
-          item.from ??
-          item.first;
-        const p2 =
-          item.cell2 ??
-          item.c2 ??
-          item.index2 ??
-          item.idx2 ??
-          item.b ??
-          item.p2 ??
-          item.pos2 ??
-          item.to ??
-          item.second;
-
-        if (p1 === index || p2 === index) return color;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                               TILE COMPONENT                               */
-/* -------------------------------------------------------------------------- */
-
-export const Tile: React.FC<TileProps> = ({
-  val,
-  isFixed,
-  linkedColor,
-  cageEdges,
-  isWrong,
-  wrongAnim,
-  tileSize,
-  margin,
-  gridSize,
-  onPress,
-}) => {
-  const { ui: uiTheme } = useTheme();
-  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
-
-  const isDenseGrid = (gridSize && gridSize >= 8) || tileSize < 42;
-  const cageBorderThickness = isDenseGrid ? 2 : 3;
-  const cageTargetFontSize = isDenseGrid ? 9 : 11;
-
-  const activeCageColor = uiTheme.cageBorder || uiTheme.primary;
-
-  const getEmptyBackground = () => {
-    if (cageEdges) {
-      const cageIdx = cageEdges.cageId ?? 0;
-      if (uiTheme.cageTints && uiTheme.cageTints.length > 0) {
-        return {
-          backgroundColor:
-            uiTheme.cageTints[cageIdx % uiTheme.cageTints.length],
-        };
-      }
-      return { backgroundColor: `${activeCageColor}18` };
-    }
-    if (linkedColor && val === 0) return { backgroundColor: `${linkedColor}1F` };
-    return styles.tileEmpty;
-  };
-
-  return (
-    <TouchableOpacity
-      activeOpacity={isFixed ? 1 : 0.7}
-      onPress={onPress}
-      disabled={isFixed}
-      style={{
-        width: tileSize,
-        height: tileSize,
-        margin,
-      }}
-    >
-      <Animated.View
-        style={[
-          styles.fullCell,
-          val === 0 && getEmptyBackground(),
-          val === 1 && styles.tileOne,
-          val === 2 && styles.tileTwo,
-          isFixed && styles.tileFixed,
-          isWrong && wrongAnim && {
-            opacity: wrongAnim,
-            borderColor: uiTheme.danger,
-            borderWidth: 2,
-          },
-        ]}
-      >
-        {linkedColor && (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.linkedBorderOverlay,
-              { borderColor: linkedColor },
-            ]}
-          />
-        )}
-
-        {cageEdges && (
-          <>
-            {/* Dark Contrast Halo Underlay */}
-            <View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFillObject,
-                styles.cageOverlay,
-                {
-                  borderTopWidth: cageEdges.top ? cageBorderThickness + 2 : 0,
-                  borderBottomWidth: cageEdges.bottom ? cageBorderThickness + 2 : 0,
-                  borderLeftWidth: cageEdges.left ? cageBorderThickness + 2 : 0,
-                  borderRightWidth: cageEdges.right ? cageBorderThickness + 2 : 0,
-                  borderColor: "rgba(0, 0, 0, 0.45)",
-                },
-              ]}
-            />
-
-            {/* Primary Theme-Aware Cage Border */}
-            <View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFillObject,
-                styles.cageOverlay,
-                {
-                  borderTopWidth: cageEdges.top ? cageBorderThickness : 0,
-                  borderBottomWidth: cageEdges.bottom ? cageBorderThickness : 0,
-                  borderLeftWidth: cageEdges.left ? cageBorderThickness : 0,
-                  borderRightWidth: cageEdges.right ? cageBorderThickness : 0,
-                  borderColor: activeCageColor,
-                },
-              ]}
-            />
-          </>
-        )}
-
-        {linkedColor && (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.linkedBadge,
-              { backgroundColor: linkedColor },
-            ]}
-          >
-            <FontAwesome name="link" size={9} color="#FFFFFF" />
-          </View>
-        )}
-
-        {cageEdges?.target !== undefined && (
-          <View style={styles.cageTargetBadge}>
-            <Text
-              style={[
-                styles.cageTargetText,
-                {
-                  fontSize: cageTargetFontSize,
-                  lineHeight: cageTargetFontSize + 1,
-                },
-              ]}
-            >
-              {cageEdges.target}
-            </Text>
-          </View>
-        )}
-
-        {val !== 0 && (
-          <Text
-            style={[
-              styles.tileText,
-              val === 1 ? styles.tileTextOne : styles.tileTextTwo,
-              isFixed && styles.tileTextFixed,
-            ]}
-          >
-            {val}
-          </Text>
-        )}
-      </Animated.View>
-    </TouchableOpacity>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/*                              WIN MODAL COMPONENT                           */
-/* -------------------------------------------------------------------------- */
-
-export const WinModal: React.FC<WinModalProps> = ({
-  visible,
-  starAnims,
-  starCount,
-  previousStars,
-  moves,
-  onNext,
-}) => {
-  const { ui: uiTheme } = useTheme();
-  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
-
-  if (!visible) return null;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Level Cleared!</Text>
-          <Text style={styles.modalSubtitle}>Completed in {moves} moves</Text>
-
-          <View style={styles.starsRow}>
-            {starAnims.map((anim, idx) => {
-              const isEarned = idx < starCount;
-              return (
-                <Animated.Text
-                  key={idx}
-                  style={[
-                    styles.starIcon,
-                    {
-                      transform: [{ scale: anim }],
-                      opacity: isEarned ? 1 : 0.3,
-                    },
-                  ]}
-                >
-                  ★
-                </Animated.Text>
-              );
-            })}
-          </View>
-
-          {starCount > previousStars && previousStars > 0 && (
-            <Text style={styles.newBestText}>New High Score!</Text>
-          )}
-
-          <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-            <Text style={styles.nextButtonText}>Next Level</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/*                            PUZZLE BOARD COMPONENT                          */
-/* -------------------------------------------------------------------------- */
-
 export default function PuzzleBoard({
   levelData,
   chapterId,
@@ -466,88 +45,205 @@ export default function PuzzleBoard({
   size,
   onNextLevel,
   forcedReset,
-  daily,
 }: PuzzleBoardProps) {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const [grid, setGrid] = useState<number[]>([...levelData.grid]);
+  const [history, setHistory] = useState<number[][]>([]);
   const [moves, setMoves] = useState<number>(0);
   const [isWon, setIsWon] = useState<boolean>(false);
   const [starCount, setStarCount] = useState<number>(3);
-  const wrongAnim = useRef(new Animated.Value(1)).current;
+  const [hintedIndex, setHintedIndex] = useState<number | null>(null);
+
   const starAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
 
-  const maxBoardWidth = SCREEN_WIDTH - spacing.lg * 2;
-  const innerWidth = maxBoardWidth - spacing.md * 2;
-  const tileSize = Math.floor((innerWidth - size * (TILE_MARGIN * 2)) / size);
+  // Trigger haptic feedback helper
+  const triggerHaptic = (type: "light" | "medium" | "success") => {
+    try {
+      if (type === "light") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (type === "medium") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (type === "success") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // Ignore if native haptics module is unavailable
+    }
+  };
+
+  // Layout Calculations
+  const counterSize = 30;
+  const maxAvailableWidth = SCREEN_WIDTH - spacing.md * 4;
+  const maxAvailableHeight = SCREEN_HEIGHT * 0.55;
+  const dimensionLimit = Math.min(maxAvailableWidth, maxAvailableHeight);
+
+  const innerBoardWidth = dimensionLimit - counterSize - spacing.sm * 2;
+  const tileSize = Math.floor((innerBoardWidth - size * (TILE_MARGIN * 2)) / size);
 
   useEffect(() => {
-    setGrid([...levelData.grid]);
-    setMoves(0);
-    setIsWon(false);
-    console.log("RAW LEVEL DATA CAGES:", JSON.stringify(levelData.cages, null, 2));
-  }, [levelData, forcedReset]);
+    let active = true;
+    (async () => {
+      const activeSession = await getActiveSession();
+      if (
+        active &&
+        activeSession &&
+        activeSession.chapterId === chapterId &&
+        activeSession.levelId === level &&
+        activeSession.grid.length === levelData.grid.length
+      ) {
+        setGrid(activeSession.grid);
+        setMoves(activeSession.moves ?? 0);
+        return;
+      }
 
-  const isFixedIndex = useCallback(
-    (index: number) => levelData.grid[index] !== 0,
-    [levelData.grid]
-  );
+      const savedGrid = await getLevelState(chapterId, level);
+      if (active) {
+        setGrid(savedGrid && savedGrid.length === levelData.grid.length ? savedGrid : [...levelData.grid]);
+        setMoves(0);
+        setHistory([]);
+        setIsWon(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [levelData, chapterId, level, forcedReset]);
 
-  const isVoidIndex = useCallback(
-    (index: number) => levelData.voids?.includes(index) ?? false,
-    [levelData.voids]
-  );
+  const isFixedIndex = useCallback((idx: number) => levelData.grid[idx] !== 0, [levelData.grid]);
+  const isVoidIndex = useCallback((idx: number) => levelData.voids?.includes(idx) ?? false, [levelData.voids]);
+
+  const initialEmptyCount = useMemo(() => {
+    return levelData.grid.filter((val, idx) => val === 0 && !isVoidIndex(idx)).length;
+  }, [levelData.grid, isVoidIndex]);
+
+  const estimatedOptionalMoves = useMemo(() => {
+    if (levelData.par) return levelData.par;
+    if (levelData.minMoves) return levelData.minMoves;
+    return Math.ceil(initialEmptyCount * 1.5);
+  }, [levelData.par, levelData.minMoves, initialEmptyCount]);
+
+  const getLinkInfo = useCallback((idx1: number, idx2: number) => {
+    const pairs = levelData.linkedPairs;
+    if (!pairs || !Array.isArray(pairs)) return null;
+
+    for (const pair of pairs) {
+      let a: number | undefined, b: number | undefined, type = "equal";
+      if (Array.isArray(pair)) {
+        a = pair[0];
+        b = pair[1];
+      } else if (typeof pair === "object" && pair !== null) {
+        a = pair.idx1 ?? pair.cell1 ?? pair.a ?? pair.from;
+        b = pair.idx2 ?? pair.cell2 ?? pair.b ?? pair.to;
+        if (pair.type) type = pair.type;
+      }
+
+      if ((a === idx1 && b === idx2) || (a === idx2 && b === idx1)) {
+        return { linked: true, type };
+      }
+    }
+    return null;
+  }, [levelData.linkedPairs]);
+
+  const getLinkedPartners = useCallback((idx: number) => {
+    const pairs = levelData.linkedPairs;
+    if (!pairs || !Array.isArray(pairs)) return [];
+
+    const partners: { partnerIdx: number; type: string }[] = [];
+    for (const pair of pairs) {
+      let a: number | undefined, b: number | undefined, type = "equal";
+      if (Array.isArray(pair)) {
+        a = pair[0];
+        b = pair[1];
+      } else if (typeof pair === "object" && pair !== null) {
+        a = pair.idx1 ?? pair.cell1 ?? pair.a ?? pair.from;
+        b = pair.idx2 ?? pair.cell2 ?? pair.b ?? pair.to;
+        if (pair.type) type = pair.type;
+      }
+
+      if (a === idx && b !== undefined) {
+        partners.push({ partnerIdx: b, type });
+      } else if (b === idx && a !== undefined) {
+        partners.push({ partnerIdx: a, type });
+      }
+    }
+    return partners;
+  }, [levelData.linkedPairs]);
+
+  const targetPerType = Math.floor(size / 2);
+
+  const rowCounts = useMemo(() => {
+    const counts = [];
+    for (let r = 0; r < size; r++) {
+      let ones = 0, twos = 0;
+      for (let c = 0; c < size; c++) {
+        const val = grid[r * size + c];
+        if (val === 1) ones++;
+        if (val === 2) twos++;
+      }
+      counts.push({ ones, twos });
+    }
+    return counts;
+  }, [grid, size]);
+
+  const colCounts = useMemo(() => {
+    const counts = [];
+    for (let c = 0; c < size; c++) {
+      let ones = 0, twos = 0;
+      for (let r = 0; r < size; r++) {
+        const val = grid[r * size + c];
+        if (val === 1) ones++;
+        if (val === 2) twos++;
+      }
+      counts.push({ ones, twos });
+    }
+    return counts;
+  }, [grid, size]);
 
   const checkIsWon = (currentGrid: number[]) => {
     const isFilled = !currentGrid.some((val, i) => val === 0 && !isVoidIndex(i));
     if (!isFilled) return false;
 
+    // Consecutive 3 Check (Rows)
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size - 2; c++) {
-        const i1 = r * size + c;
-        const i2 = r * size + (c + 1);
-        const i3 = r * size + (c + 2);
+        const i1 = r * size + c, i2 = r * size + (c + 1), i3 = r * size + (c + 2);
         if (isVoidIndex(i1) || isVoidIndex(i2) || isVoidIndex(i3)) continue;
-        if (
-          currentGrid[i1] !== 0 &&
-          currentGrid[i1] === currentGrid[i2] &&
-          currentGrid[i2] === currentGrid[i3]
-        ) {
+        if (currentGrid[i1] !== 0 && currentGrid[i1] === currentGrid[i2] && currentGrid[i2] === currentGrid[i3]) {
           return false;
         }
       }
     }
 
+    // Consecutive 3 Check (Columns)
     for (let c = 0; c < size; c++) {
       for (let r = 0; r < size - 2; r++) {
-        const i1 = r * size + c;
-        const i2 = (r + 1) * size + c;
-        const i3 = (r + 2) * size + c;
+        const i1 = r * size + c, i2 = (r + 1) * size + c, i3 = (r + 2) * size + c;
         if (isVoidIndex(i1) || isVoidIndex(i2) || isVoidIndex(i3)) continue;
-        if (
-          currentGrid[i1] !== 0 &&
-          currentGrid[i1] === currentGrid[i2] &&
-          currentGrid[i2] === currentGrid[i3]
-        ) {
+        if (currentGrid[i1] !== 0 && currentGrid[i1] === currentGrid[i2] && currentGrid[i2] === currentGrid[i3]) {
           return false;
         }
       }
     }
 
-    for (let i = 0; i < currentGrid.length; i++) {
-      if (isVoidIndex(i)) continue;
-      const linked = getLinkedIndices(levelData, i);
-      if (linked.length > 1) {
-        const val = currentGrid[i];
-        for (const partnerIdx of linked) {
-          if (!isVoidIndex(partnerIdx) && currentGrid[partnerIdx] !== val) {
-            return false;
-          }
+    // Linked Pairs Validation
+    if (levelData.linkedPairs && Array.isArray(levelData.linkedPairs)) {
+      for (const pair of levelData.linkedPairs) {
+        let idx1: number | undefined, idx2: number | undefined, expectedType = "equal";
+        if (Array.isArray(pair)) {
+          idx1 = pair[0];
+          idx2 = pair[1];
+        } else if (typeof pair === "object" && pair !== null) {
+          idx1 = pair.idx1 ?? pair.cell1 ?? pair.a ?? pair.from;
+          idx2 = pair.idx2 ?? pair.cell2 ?? pair.b ?? pair.to;
+          if (pair.type) expectedType = pair.type;
+        }
+
+        if (idx1 !== undefined && idx2 !== undefined) {
+          const val1 = currentGrid[idx1];
+          const val2 = currentGrid[idx2];
+          if (val1 === 0 || val2 === 0) return false;
+          if (expectedType === "equal" && val1 !== val2) return false;
+          if (expectedType === "opposite" && val1 === val2) return false;
         }
       }
     }
@@ -555,16 +251,25 @@ export default function PuzzleBoard({
     return true;
   };
 
-  const handleTilePress = (index: number) => {
+  const handleTilePress = async (index: number) => {
+    // Touch guard: do nothing if cell is fixed, void, or level is already completed
     if (isFixedIndex(index) || isVoidIndex(index) || isWon) return;
 
-    const nextVal = (grid[index] + 1) % 3;
-    const linkedIndices = getLinkedIndices(levelData, index);
+    triggerHaptic("light");
+    setHistory((prev) => [...prev, grid]);
 
+    const nextVal = (grid[index] + 1) % 3;
     const nextGrid = [...grid];
-    linkedIndices.forEach((idx) => {
-      if (!isVoidIndex(idx) && !isFixedIndex(idx)) {
-        nextGrid[idx] = nextVal;
+    nextGrid[index] = nextVal;
+
+    const partners = getLinkedPartners(index);
+    partners.forEach(({ partnerIdx, type }) => {
+      if (!isFixedIndex(partnerIdx) && !isVoidIndex(partnerIdx)) {
+        if (type === "opposite") {
+          nextGrid[partnerIdx] = nextVal === 1 ? 2 : nextVal === 2 ? 1 : 0;
+        } else {
+          nextGrid[partnerIdx] = nextVal;
+        }
       }
     });
 
@@ -572,10 +277,29 @@ export default function PuzzleBoard({
     const newMoves = moves + 1;
     setMoves(newMoves);
 
+    await saveActiveSession({ chapterId, levelId: level, grid: nextGrid, moves: newMoves });
+
     if (checkIsWon(nextGrid)) {
       setIsWon(true);
-      setStarCount(newMoves < 15 ? 3 : newMoves < 25 ? 2 : 1);
+      triggerHaptic("success");
+
+      const par = estimatedOptionalMoves;
+      const stars =
+        newMoves <= par + 3
+          ? 3
+          : newMoves <= par + Math.max(6, Math.floor(par * 0.5))
+          ? 2
+          : 1;
+
+      setStarCount(stars);
+
+      // FIXED: Pass `level` (current level solved), NOT `level + 1`
+      await unlockNextLevel(chapterId, level);
+      await saveLevelStars(chapterId, level, stars);
+      await clearActiveSession(chapterId, level);
+
       starAnims.forEach((anim, i) => {
+        anim.setValue(0);
         Animated.spring(anim, {
           toValue: 1,
           tension: 50,
@@ -587,33 +311,34 @@ export default function PuzzleBoard({
     }
   };
 
-  const getCageEdgesForIndex = (index: number): CageEdges | null => {
-    if (!levelData.cages) return null;
-    const cageIndex = levelData.cages.findIndex((c) =>
-      c.indices.includes(index)
-    );
-    if (cageIndex === -1) return null;
+  const handleUndo = async () => {
+    if (history.length === 0 || isWon) return;
+    triggerHaptic("medium");
+    const previousGrid = history[history.length - 1];
+    setGrid(previousGrid);
+    setHistory((prev) => prev.slice(0, -1));
+    const newMoves = Math.max(0, moves - 1);
+    setMoves(newMoves);
+    await saveActiveSession({ chapterId, levelId: level, grid: previousGrid, moves: newMoves });
+  };
 
-    const cage = levelData.cages[cageIndex];
-    const row = Math.floor(index / size);
-    const col = index % size;
-    const isTop = row === 0 || !cage.indices.includes((row - 1) * size + col);
-    const isBottom =
-      row === size - 1 || !cage.indices.includes((row + 1) * size + col);
-    const isLeft = col === 0 || !cage.indices.includes(row * size + (col - 1));
-    const isRight =
-      col === size - 1 || !cage.indices.includes(row * size + (col + 1));
+  const handleRestart = async () => {
+    if (isWon) return;
+    triggerHaptic("medium");
+    setGrid([...levelData.grid]);
+    setHistory([]);
+    setMoves(0);
+    await clearActiveSession(chapterId, level);
+  };
 
-    const isFirstInCage = cage.indices[0] === index;
-
-    return {
-      top: isTop,
-      bottom: isBottom,
-      left: isLeft,
-      right: isRight,
-      target: isFirstInCage ? cage.target : undefined,
-      cageId: cageIndex,
-    };
+  const handleHint = () => {
+    if (isWon) return;
+    triggerHaptic("light");
+    const firstEmpty = grid.findIndex((v, i) => v === 0 && !isVoidIndex(i));
+    if (firstEmpty !== -1) {
+      setHintedIndex(firstEmpty);
+      setTimeout(() => setHintedIndex(null), 1800);
+    }
   };
 
   return (
@@ -622,119 +347,186 @@ export default function PuzzleBoard({
         <Text style={styles.moveText}>MOVES: {moves}</Text>
       </View>
 
-      <View style={styles.gameWrapper}>
-        <View style={styles.boardCard}>
-          {Array.from({ length: size }).map((_, rowIndex) => (
-            <View key={rowIndex} style={styles.boardRow}>
-              {Array.from({ length: size }).map((_, colIndex) => {
-                const idx = rowIndex * size + colIndex;
-                const val = grid[idx];
-
-                if (isVoidIndex(idx)) {
-                  return (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.voidCell,
-                        {
-                          width: tileSize,
-                          height: tileSize,
-                          margin: TILE_MARGIN,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.voidCellMark}>✕</Text>
-                    </View>
-                  );
-                }
-
-                return (
-                  <Tile
-                    key={idx}
-                    val={val}
-                    isFixed={isFixedIndex(idx)}
-                    linkedColor={extractLinkedColor(levelData, idx, uiTheme)}
-                    cageEdges={getCageEdgesForIndex(idx)}
-                    wrongAnim={wrongAnim}
-                    tileSize={tileSize}
-                    margin={TILE_MARGIN}
-                    gridSize={size}
-                    onPress={() => handleTilePress(idx)}
-                  />
-                );
-              })}
+      <View style={styles.boardCard}>
+        {/* Top Column Counters */}
+        <View style={styles.columnCountersRow}>
+          {colCounts.map((col, cIdx) => (
+            <View key={cIdx} style={[styles.colCounterBox, { width: tileSize, marginHorizontal: TILE_MARGIN }]}>
+              <Text style={styles.counterText1}>{col.ones}/{targetPerType}</Text>
+              <Text style={styles.counterText2}>{col.twos}/{targetPerType}</Text>
             </View>
           ))}
+          <View style={{ width: counterSize }} />
         </View>
+
+        {/* Board Rows & Cell Links */}
+        {Array.from({ length: size }).map((_, rowIndex) => (
+          <View key={rowIndex} style={styles.boardRow}>
+            {Array.from({ length: size }).map((_, colIndex) => {
+              const idx = rowIndex * size + colIndex;
+              const val = grid[idx];
+              const isFixed = isFixedIndex(idx);
+              const isVoid = isVoidIndex(idx);
+
+              const rightLink = colIndex < size - 1 ? getLinkInfo(idx, idx + 1) : null;
+              const bottomLink = rowIndex < size - 1 ? getLinkInfo(idx, idx + size) : null;
+
+              return (
+                <View key={idx} style={{ position: "relative" }}>
+                  {isVoid ? (
+                    <View style={[styles.voidCell, { width: tileSize, height: tileSize, margin: TILE_MARGIN }]}>
+                      <Text style={styles.voidCellMark}>✕</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      activeOpacity={isFixed || isWon ? 1 : 0.7}
+                      disabled={isFixed || isWon}
+                      onPress={() => handleTilePress(idx)}
+                      style={[
+                        styles.tile,
+                        { width: tileSize, height: tileSize, margin: TILE_MARGIN },
+                        val === 0 && styles.tileEmpty,
+                        val === 1 && styles.tileOne,
+                        val === 2 && styles.tileTwo,
+                        isFixed && styles.tileFixed,
+                        hintedIndex === idx && styles.tileHinted,
+                      ]}
+                    >
+                      {val !== 0 && (
+                        <Text style={[styles.tileText, val === 1 ? styles.tileTextOne : styles.tileTextTwo]}>
+                          {val}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Horizontal Link Badge */}
+                  {rightLink?.linked && (
+                    <View style={styles.rightLinkConnector}>
+                      <Text style={styles.linkSymbol}>{rightLink.type === "opposite" ? "≠" : "="}</Text>
+                    </View>
+                  )}
+
+                  {/* Vertical Link Badge */}
+                  {bottomLink?.linked && (
+                    <View style={styles.bottomLinkConnector}>
+                      <Text style={styles.linkSymbol}>{bottomLink.type === "opposite" ? "≠" : "="}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            {/* Row Counter Box */}
+            <View style={[styles.rowCounterBox, { height: tileSize, width: counterSize, marginVertical: TILE_MARGIN }]}>
+              <Text style={styles.counterText1}>{rowCounts[rowIndex].ones}/{targetPerType}</Text>
+              <Text style={styles.counterText2}>{rowCounts[rowIndex].twos}/{targetPerType}</Text>
+            </View>
+          </View>
+        ))}
       </View>
 
-      <WinModal
-        visible={isWon}
-        starAnims={starAnims}
-        starCount={starCount}
-        previousStars={0}
-        moves={moves}
-        onNext={onNextLevel}
-      />
+      {/* Control Buttons */}
+      <View style={styles.controlsBar}>
+        <TouchableOpacity
+          style={[styles.controlBtn, (history.length === 0 || isWon) && styles.controlBtnDisabled]}
+          onPress={handleUndo}
+          disabled={history.length === 0 || isWon}
+        >
+          <FontAwesome name="undo" size={16} color={history.length === 0 || isWon ? uiTheme.textDisabled : uiTheme.textPrimary} />
+          <Text style={[styles.controlBtnText, (history.length === 0 || isWon) && styles.controlBtnTextDisabled]}>Undo</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.controlBtn, isWon && styles.controlBtnDisabled]} onPress={handleRestart} disabled={isWon}>
+          <FontAwesome name="refresh" size={16} color={isWon ? uiTheme.textDisabled : uiTheme.textPrimary} />
+          <Text style={[styles.controlBtnText, isWon && styles.controlBtnTextDisabled]}>Restart</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.controlBtn, isWon && styles.controlBtnDisabled]} onPress={handleHint} disabled={isWon}>
+          <FontAwesome name="lightbulb-o" size={16} color={isWon ? uiTheme.textDisabled : uiTheme.warning} />
+          <Text style={[styles.controlBtnText, { color: isWon ? uiTheme.textDisabled : uiTheme.warning }]}>Hint</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Victory Modal */}
+      <Modal visible={isWon} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Level Cleared!</Text>
+            <Text style={styles.modalSubtitle}>Completed in {moves} moves</Text>
+            <View style={styles.starsRow}>
+              {starAnims.map((anim, idx) => (
+                <Animated.Text key={idx} style={[styles.starIcon, { transform: [{ scale: anim }], opacity: idx < starCount ? 1 : 0.3 }]}>
+                  ★
+                </Animated.Text>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.nextButton} onPress={onNextLevel}>
+              <Text style={styles.nextButtonText}>Next Level</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/*                                   STYLES                                   */
-/* -------------------------------------------------------------------------- */
 
 const makeStyles = (uiTheme: UITheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
       alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: uiTheme.background,
+      justifyContent: "space-between",
+      paddingVertical: spacing.md,
     },
     header: {
-      marginBottom: spacing.lg,
       alignItems: "center",
     },
     moveText: {
       ...typography.title,
+      fontSize: 16,
       color: uiTheme.textPrimary,
       letterSpacing: 1.5,
     },
-    gameWrapper: {
-      alignItems: "center",
-      justifyContent: "center",
-      width: "100%",
-    },
     boardCard: {
-      alignSelf: "center",
-      padding: spacing.md,
+      padding: spacing.sm,
       borderRadius: radii.xl,
       backgroundColor: uiTheme.surface,
       borderWidth: 1,
       borderColor: uiTheme.border,
       ...shadows.md,
     },
+    columnCountersRow: {
+      flexDirection: "row",
+      marginBottom: spacing.xs,
+    },
+    colCounterBox: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rowCounterBox: {
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: spacing.xs,
+    },
+    counterText1: {
+      fontSize: 9,
+      fontWeight: "700",
+      color: uiTheme.primary,
+    },
+    counterText2: {
+      fontSize: 9,
+      fontWeight: "700",
+      color: uiTheme.textPrimary,
+    },
     boardRow: {
       flexDirection: "row",
-      justifyContent: "center",
       alignItems: "center",
     },
-    fullCell: {
-      flex: 1,
+    tile: {
       justifyContent: "center",
       alignItems: "center",
       borderRadius: radii.sm,
-      position: "relative",
-    },
-    voidCell: {
-      backgroundColor: "transparent",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    voidCellMark: {
-      ...typography.body,
-      color: uiTheme.textDisabled,
     },
     tileEmpty: {
       backgroundColor: uiTheme.surfaceSunken,
@@ -743,14 +535,18 @@ const makeStyles = (uiTheme: UITheme) =>
       backgroundColor: uiTheme.primary,
     },
     tileTwo: {
-      backgroundColor: uiTheme.primaryDeep,
+      backgroundColor: uiTheme.primaryDeep ?? "#2B3A4A",
     },
     tileFixed: {
-      opacity: 0.9,
+      opacity: 0.85,
+    },
+    tileHinted: {
+      borderWidth: 3,
+      borderColor: uiTheme.warning,
     },
     tileText: {
       ...typography.title,
-      fontSize: 22,
+      fontSize: 18,
       fontWeight: "800",
     },
     tileTextOne: {
@@ -759,52 +555,83 @@ const makeStyles = (uiTheme: UITheme) =>
     tileTextTwo: {
       color: "#FFFFFF",
     },
-    tileTextFixed: {
-      fontWeight: "900",
-    },
-    cageOverlay: {
-      borderRadius: radii.sm,
-      zIndex: 2,
-    },
-    cageTargetBadge: {
-      position: "absolute",
-      top: 2,
-      left: 2,
-      zIndex: 10,
-      backgroundColor: "rgba(0, 0, 0, 0.45)",
-      paddingHorizontal: 3,
-      paddingVertical: 1,
-      borderRadius: 3,
-    },
-    cageTargetText: {
-      fontWeight: "800",
-      color: "#FFFFFF",
-    },
-    linkedBorderOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      borderRadius: radii.sm,
-      borderWidth: 2,
-      zIndex: 3,
-    },
-    linkedBadge: {
-      position: "absolute",
-      top: 3,
-      right: 3,
-      width: 17,
-      height: 17,
-      borderRadius: 8.5,
-      alignItems: "center",
+    voidCell: {
       justifyContent: "center",
+      alignItems: "center",
+    },
+    voidCellMark: {
+      color: uiTheme.textDisabled,
+    },
+    rightLinkConnector: {
+      position: "absolute",
+      right: -11,
+      top: "50%",
+      marginTop: -9,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: uiTheme.primary,
+      justifyContent: "center",
+      alignItems: "center",
       zIndex: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.25,
-      shadowRadius: 1.5,
-      elevation: 3,
+      ...shadows.sm,
+      elevation: 5,
+    },
+    bottomLinkConnector: {
+      position: "absolute",
+      bottom: -11,
+      left: "50%",
+      marginLeft: -9,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: uiTheme.primary,
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 10,
+      ...shadows.sm,
+      elevation: 5,
+    },
+    linkSymbol: {
+      color: "#FFFFFF",
+      fontSize: 11,
+      fontWeight: "bold",
+      textAlign: "center",
+      lineHeight: 13,
+    },
+    controlsBar: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      width: "90%",
+      marginTop: spacing.sm,
+    },
+    controlBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: uiTheme.surface,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: uiTheme.border,
+      gap: spacing.xs,
+      ...shadows.sm,
+    },
+    controlBtnDisabled: {
+      opacity: 0.5,
+    },
+    controlBtnText: {
+      ...typography.body,
+      fontSize: 14,
+      fontWeight: "600",
+      color: uiTheme.textPrimary,
+    },
+    controlBtnTextDisabled: {
+      color: uiTheme.textDisabled,
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.65)",
+      backgroundColor: "rgba(0,0,0,0.65)",
       justifyContent: "center",
       alignItems: "center",
     },
@@ -818,14 +645,13 @@ const makeStyles = (uiTheme: UITheme) =>
     },
     modalTitle: {
       ...typography.display,
-      fontSize: 24,
+      fontSize: 22,
       color: uiTheme.textPrimary,
-      marginBottom: spacing.xs,
     },
     modalSubtitle: {
       ...typography.caption,
       color: uiTheme.textMuted,
-      marginBottom: spacing.md,
+      marginVertical: spacing.xs,
     },
     starsRow: {
       flexDirection: "row",
@@ -833,16 +659,10 @@ const makeStyles = (uiTheme: UITheme) =>
       gap: spacing.xs,
     },
     starIcon: {
-      fontSize: 40,
+      fontSize: 36,
       color: uiTheme.star,
     },
-    newBestText: {
-      ...typography.caption,
-      color: uiTheme.success,
-      marginBottom: spacing.sm,
-    },
     nextButton: {
-      marginTop: spacing.md,
       backgroundColor: uiTheme.primary,
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,

@@ -1,4 +1,4 @@
-import React, { useMemo, memo } from "react";
+import React, { useMemo, memo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from "react-native";
+import { getUnlockedLevels, getAllLevelStars } from "../utils/progress";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
@@ -19,8 +20,9 @@ type LevelItem = {
 };
 
 type LevelSelectProps = {
-  levels: LevelItem[];
-  onSelectLevel: (level: LevelItem) => void;
+  chapterId: number;
+  levels: { id: number }[];
+  onSelectLevel: (levelId: number) => void;
 };
 
 type LevelButtonProps = {
@@ -84,10 +86,61 @@ const LevelButton = memo(({ item, onPress, itemSize }: LevelButtonProps) => {
   );
 });
 
-export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps) {
+export default function LevelSelect({ chapterId, levels, onSelectLevel }: LevelSelectProps) {
   const { ui: uiTheme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [unlockedMax, setUnlockedMax] = useState<number>(1);
+  const [starsMap, setStarsMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadLevelData = async () => {
+      setIsLoading(true);
+      try {
+        const [maxUnlocked, allStars] = await Promise.all([
+          getUnlockedLevels(chapterId),
+          getAllLevelStars(),
+        ]);
+
+        if (isMounted) {
+          setUnlockedMax(maxUnlocked);
+          setStarsMap(allStars);
+        }
+      } catch (error) {
+        console.error("Failed to load level progress:", error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadLevelData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [chapterId]);
+
+  const hydratedLevels = useMemo<LevelItem[]>(() => {
+    if (!levels) return [];
+
+    return levels.map((lvl) => {
+      const stars = starsMap[`${chapterId}_${lvl.id}`] ?? 0;
+      // Level is unlocked if: level 1, or level ID <= max unlocked level, or stars have been earned
+      const isLocked = lvl.id > 1 && lvl.id > unlockedMax && stars === 0;
+
+      return {
+        id: lvl.id,
+        stars,
+        isLocked,
+      };
+    });
+  }, [levels, starsMap, unlockedMax, chapterId]);
 
   const itemSize = useMemo(() => {
     const effectiveWidth = Math.min(windowWidth, MAX_WEB_CONTAINER_WIDTH);
@@ -99,7 +152,7 @@ export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps)
     return Math.floor(availableWidth / COLUMNS_PER_ROW);
   }, [windowWidth]);
 
-  if (levels === undefined) {
+  if (isLoading || levels === undefined) {
     return (
       <View style={styles.emptyContainer}>
         <ActivityIndicator size="large" color={uiTheme.primary} />
@@ -120,16 +173,16 @@ export default function LevelSelect({ levels, onSelectLevel }: LevelSelectProps)
     <View style={styles.outerWrapper}>
       <View style={styles.container}>
         <FlatList
-          data={levels}
-          extraData={levels}
+          data={hydratedLevels}
+          extraData={hydratedLevels}
           renderItem={({ item }) => (
             <LevelButton
               item={item}
-              onPress={onSelectLevel}
+              onPress={(selectedItem) => onSelectLevel(selectedItem.id)}
               itemSize={itemSize}
             />
           )}
-          keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}`}
+          keyExtractor={(item) => `level-${item.id}-${item.stars ?? 0}-${item.isLocked}`}
           numColumns={COLUMNS_PER_ROW}
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}

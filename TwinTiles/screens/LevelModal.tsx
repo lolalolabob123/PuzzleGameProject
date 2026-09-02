@@ -3,10 +3,9 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import LevelSelect from '../components/LevelSelect';
 import { LevelModalProps } from '../navigation/types';
 import { chapters } from '../data/chapters';
-import { getLevelStars } from '../utils/progress';
+import { getLevelStars, getUnlockedLevels } from '../utils/progress';
 import { useTheme } from '../context/ThemeContext';
 
-// Extract the level item type directly from LevelSelect's props
 type LevelItem = React.ComponentProps<typeof LevelSelect>['levels'][number];
 
 export default function LevelModalScreen({ route, navigation }: LevelModalProps) {
@@ -21,12 +20,31 @@ export default function LevelModalScreen({ route, navigation }: LevelModalProps)
     const chapter = chapters[chapterId];
     const rawLevels = chapter?.levels || [];
 
+    // Fetch list of unlocked level IDs and normalize to an array
+    const rawUnlocked = await getUnlockedLevels(chapterId);
+    const unlockedIds: number[] = Array.isArray(rawUnlocked)
+      ? rawUnlocked
+      : typeof rawUnlocked === 'number'
+      ? [rawUnlocked]
+      : [];
+
+    const unlockedSet = new Set<number>(unlockedIds.length > 0 ? unlockedIds : [1]);
+
     const enrichedLevels: LevelItem[] = await Promise.all(
-      rawLevels.map(async (level) => {
+      rawLevels.map(async (level, index) => {
         const starCount = await getLevelStars(chapterId, level.id);
-        return { 
-          id: level.id, 
-          stars: starCount 
+
+        const isUnlocked =
+          index === 0 ||
+          level.id === 1 ||
+          unlockedSet.has(level.id);
+
+        return {
+          ...level,
+          id: level.id,
+          stars: starCount,
+          unlocked: isUnlocked,
+          isUnlocked: isUnlocked,
         } as LevelItem;
       })
     );
@@ -46,10 +64,12 @@ export default function LevelModalScreen({ route, navigation }: LevelModalProps)
         <ActivityIndicator style={styles.loader} size="large" color={uiTheme.primary} />
       ) : (
         <LevelSelect
+          chapterId={chapterId}
           levels={levelsWithProgress}
-          onSelectLevel={(level) => {
+          onSelectLevel={(level: any) => {
+            const selectedId = typeof level === 'number' ? level : level?.id;
             navigation.navigate("Game", {
-              levelId: level.id,
+              levelId: selectedId,
               chapterId: chapterId,
               themeIndex: themeIndex,
             });

@@ -1,12 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { chapters } from '../data/chapters';
+import { chapters } from "../data/chapters";
 
 interface GameProgress {
   [ChapterKey: string]: number;
 }
 
+export interface ActiveSession {
+  chapterId: number;
+  levelId: number;
+  grid: number[];
+  moves: number;
+}
+
 const KEYS = {
   PROGRESS: "GAME_PROGRESS",
+  ACTIVE_SESSION: "ACTIVE_SESSION",
   levelState: (chapter: number, level: number) => `level_state_${chapter}_${level}`,
   stars: (chapter: number, level: number) => `stars_${chapter}_${level}`,
   prefixes: [
@@ -14,6 +22,7 @@ const KEYS = {
     "level_state_",
     "stars_",
     "GAME_PROGRESS",
+    "ACTIVE_SESSION",
     "FREE_HINTS_REMAINING",
     "HINT_COOLDOWNS",
     "STREAK_LAST_LOGIN",
@@ -36,7 +45,6 @@ const getParsed = async <T>(key: string, defaultValue: T): Promise<T> => {
 
 /**
  * Returns the highest chapter ID the user has unlocked.
- * A chapter is unlocked if Chapter 1 or if all levels in Chapter (N-1) are solved.
  */
 export const getHighestUnlockedChapter = async (): Promise<number> => {
   try {
@@ -51,11 +59,9 @@ export const getHighestUnlockedChapter = async (): Promise<number> => {
 
       const prevProgress = await getChapterProgress(prevChapterId);
       
-      // If the previous chapter has been fully solved, current chapter unlocks
       if (prevProgress.total > 0 && prevProgress.solved >= prevProgress.total) {
         highestUnlocked = currentChapterId;
       } else {
-        // Stop checking as chapters progress sequentially
         break;
       }
     }
@@ -70,7 +76,7 @@ export const getHighestUnlockedChapter = async (): Promise<number> => {
 /**
  * Gets the maximum level unlocked for a specific chapter.
  */
-export const getUnlockedLevel = async (chapterId: number): Promise<number> => {
+export const getUnlockedLevels = async (chapterId: number): Promise<number> => {
   try {
     const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {});
     return progress[`chapter_${chapterId}`] || 1;
@@ -79,14 +85,19 @@ export const getUnlockedLevel = async (chapterId: number): Promise<number> => {
   }
 };
 
+/**
+ * Unlocks the next level after solving `completedLevel`.
+ */
 export const unlockNextLevel = async (chapterId: number, completedLevel: number) => {
   try {
     const progress = await getParsed<GameProgress>(KEYS.PROGRESS, {});
     const chapterKey = `chapter_${chapterId}`;
     const currentUnlocked = progress[chapterKey] || 1;
 
-    if (completedLevel >= currentUnlocked) {
-      progress[chapterKey] = completedLevel + 1;
+    // Sets next unlocked level to completedLevel + 1
+    const nextLevel = completedLevel + 1;
+    if (nextLevel > currentUnlocked) {
+      progress[chapterKey] = nextLevel;
       await AsyncStorage.setItem(KEYS.PROGRESS, JSON.stringify(progress));
     }
   } catch (error) {
@@ -106,7 +117,6 @@ export const getLevelStars = async (chapterId: number, level: number): Promise<n
 
 /**
  * Fetches ALL level stars in a single multiGet call to eliminate storage waterfalls.
- * Returns map keyed by `${chapterId}_${levelId}` -> starCount.
  */
 export const getAllLevelStars = async (): Promise<Record<string, number>> => {
   try {
@@ -120,10 +130,8 @@ export const getAllLevelStars = async (): Promise<Record<string, number>> => {
 
     for (const [key, value] of keyValues) {
       if (value !== null) {
-        // e.g., "stars_1_2" -> keyParts: ["stars", "1", "2"]
         const parts = key.split("_");
         if (parts.length === 3) {
-          // Fixed extra bracket bug in original code
           const formattedKey = `${parts[1]}_${parts[2]}`;
           result[formattedKey] = parseInt(value, 10) || 0;
         }
@@ -200,6 +208,7 @@ export const resetChapterProgress = async (chapterId: number) => {
       await AsyncStorage.multiRemove(keysToRemove);
     }
 
+    await AsyncStorage.removeItem(KEYS.ACTIVE_SESSION);
     await wait(50);
   } catch (e) {
     console.error("Failed to reset chapter", e);
@@ -222,5 +231,51 @@ export const clearAllGameData = async () => {
     await wait(50);
   } catch (e) {
     console.error("Failed to clear all game data", e);
+  }
+};
+
+/**
+ * Saves mid-puzzle progress so the player can resume later.
+ */
+export const saveActiveSession = async (session: ActiveSession) => {
+  try {
+    await AsyncStorage.setItem(KEYS.ACTIVE_SESSION, JSON.stringify(session));
+    await saveLevelState(session.chapterId, session.levelId, session.grid);
+  } catch (e) {
+    console.error("Failed to save active session", e);
+  }
+};
+
+/**
+ * Retrieves the last played session for resuming.
+ */
+export const getActiveSession = async (): Promise<ActiveSession | null> => {
+  try {
+    const session = await getParsed<ActiveSession | null>(KEYS.ACTIVE_SESSION, null);
+    if (
+      session &&
+      typeof session.chapterId === "number" &&
+      typeof session.levelId === "number" &&
+      Array.isArray(session.grid)
+    ) {
+      return session;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Clears saved level state once a level is won or manually reset.
+ */
+export const clearActiveSession = async (chapterId?: number, levelId?: number) => {
+  try {
+    await AsyncStorage.removeItem(KEYS.ACTIVE_SESSION);
+    if (chapterId !== undefined && levelId !== undefined) {
+      await AsyncStorage.removeItem(KEYS.levelState(chapterId, levelId));
+    }
+  } catch (e) {
+    console.error("Failed to clear active session", e);
   }
 };
