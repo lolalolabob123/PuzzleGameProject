@@ -20,7 +20,11 @@
         "backgroundColor": "#D9D9D9"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.lolalolabob.TwinTiles"
+      "package": "com.lolalolabob.TwinTiles",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,6 +33,11 @@
       "expo-font",
       "expo-audio",
       "expo-video"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a212bdc6-33b7-4b38-b46c-08dd91a7d96a"
+      }
+    }
   }
 }

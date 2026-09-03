@@ -18,6 +18,7 @@ export type RootStackParamList = {
     forcedReset?: boolean;
     daily?: boolean;
   };
+  Shop: undefined;
   LevelModal: {
     chapterId: number;
     themeIndex: number;

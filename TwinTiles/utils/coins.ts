@@ -3,8 +3,60 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const KEYS = {
   COINS: "USER_COINS",
   OWNED: "OWNED_ITEMS",
-  EFFECTS: "ITEM_EFFECTS",
 };
+
+const EFFECT_KEY_PREFIX = "@effect_";
+
+// --- EFFECT / POWER-UP TOKEN STORAGE ---
+
+export async function getEffectCount(effect: string): Promise<number> {
+  try {
+    const val = await AsyncStorage.getItem(`${EFFECT_KEY_PREFIX}${effect}`);
+    return val ? parseInt(val, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function incrementEffect(effect: string, by = 1): Promise<void> {
+  try {
+    const current = await getEffectCount(effect);
+    const updated = current + by;
+    await AsyncStorage.setItem(`${EFFECT_KEY_PREFIX}${effect}`, updated.toString());
+  } catch (error) {
+    console.error("Error incrementing effect:", error);
+  }
+}
+
+export async function useEffectToken(effect: string): Promise<boolean> {
+  try {
+    const current = await getEffectCount(effect);
+    if (current <= 0) return false;
+
+    await AsyncStorage.setItem(
+      `${EFFECT_KEY_PREFIX}${effect}`,
+      (current - 1).toString()
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Alias consumeEffect to useEffectToken for backward compatibility
+export const consumeEffect = async (effect: string, count = 1): Promise<boolean> => {
+  let success = true;
+  for (let i = 0; i < count; i++) {
+    const used = await useEffectToken(effect);
+    if (!used) {
+      success = false;
+      break;
+    }
+  }
+  return success;
+};
+
+// --- GENERAL STORAGE HELPERS ---
 
 const getParsed = async <T>(key: string, defaultValue: T): Promise<T> => {
   try {
@@ -43,25 +95,4 @@ export const markOwned = async (itemId: string): Promise<void> => {
     owned.push(itemId);
     await AsyncStorage.setItem(KEYS.OWNED, JSON.stringify(owned));
   }
-};
-
-export const getEffectCount = async (effect: string): Promise<number> => {
-  const map = await getParsed<Record<string, number>>(KEYS.EFFECTS, {});
-  return map[effect] ?? 0;
-};
-
-export const incrementEffect = async (effect: string, by = 1): Promise<void> => {
-  const map = await getParsed<Record<string, number>>(KEYS.EFFECTS, {});
-  map[effect] = (map[effect] ?? 0) + by;
-  await AsyncStorage.setItem(KEYS.EFFECTS, JSON.stringify(map));
-};
-
-export const consumeEffect = async (effect: string, count = 1): Promise<boolean> => {
-  const map = await getParsed<Record<string, number>>(KEYS.EFFECTS, {});
-  const current = map[effect] ?? 0;
-  if (current < count) return false;
-  
-  map[effect] = current - count;
-  await AsyncStorage.setItem(KEYS.EFFECTS, JSON.stringify(map));
-  return true;
 };

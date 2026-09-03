@@ -1,13 +1,15 @@
-import React, { useMemo, useCallback } from "react";
-import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
+import React, { useMemo, useCallback, useState } from "react";
+import { View, StyleSheet, Text, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { FontAwesome } from "@expo/vector-icons";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-import { GameScreenProps } from "../navigation/types";
+import { RootStackParamList } from "../navigation/types";
 import PuzzleBoard, { LevelData } from "../components/PuzzleBoard";
 import { chapters } from "../data/chapters";
 import { useTheme } from "../context/ThemeContext";
-import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
+import { spacing, radii, typography, shadows } from "../constants/uiTheme";
 
 import {
   getDailyLevel,
@@ -18,6 +20,10 @@ import {
 } from "../utils/levelGenerator";
 
 import { todayKey } from "../utils/daily";
+import { getEffectCount, useEffectToken } from "../utils/coins";
+import { unlockNextLevel, saveLevelStars, clearActiveSession } from "../utils/progress";
+
+type GameScreenProps = NativeStackScreenProps<RootStackParamList, "Game">;
 
 export default function GameScreen({ route, navigation }: GameScreenProps) {
   const {
@@ -29,6 +35,28 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   } = route.params || {};
 
   const { ui: uiTheme } = useTheme();
+
+  const [hints, setHints] = useState<number>(0);
+  const [skipCount, setSkipCount] = useState<number>(0);
+  const [hintTrigger, setHintTrigger] = useState<number>(0);
+
+  // Sync consumable token balances whenever screen receives focus
+  const loadTokens = useCallback(async () => {
+    try {
+      const hintVal = await getEffectCount("extra-hints");
+      const skipVal = await getEffectCount("skip-tokens");
+      setHints(hintVal);
+      setSkipCount(skipVal);
+    } catch (err) {
+      console.error("Error loading power-up tokens:", err);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTokens();
+    }, [loadTokens])
+  );
 
   const levelData: LevelData = useMemo(() => {
     if (daily) {
@@ -104,6 +132,68 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     }
   }, [daily, chapterId, levelId, navigation, themeIndex]);
 
+  // --- POWER-UP: HINT LOGIC ---
+  const handleUseHint = async () => {
+    if (hints <= 0) {
+      Alert.alert(
+        "Out of Hints",
+        "You don't have any hints remaining. Get more in the Shop!",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Go to Shop",
+            onPress: () => navigation.navigate("Main", { screen: "Shop" } as never)
+          },
+        ]
+      );
+      return;
+    }
+
+    const success = await useEffectToken("extra-hints");
+    if (success) {
+      setHints((prev) => Math.max(0, prev - 1));
+      setHintTrigger((prev) => prev + 1);
+    }
+  };
+
+  // --- POWER-UP: SKIP LOGIC ---
+  const handleUseSkip = async () => {
+    if (skipCount <= 0) {
+      Alert.alert(
+        "Out of Skips",
+        "You don't have any skips remaining. Get more in the Shop!",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Go to Shop",
+            onPress: () => navigation.navigate("Main", { screen: "Shop" } as never)
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Skip Level?",
+      `Use 1 Skip Token to clear ${daily ? "today's level" : `Level ${levelId}`}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Skip",
+          onPress: async () => {
+            const success = await useEffectToken("skip-tokens");
+            if (success) {
+              setSkipCount((prev) => Math.max(0, prev - 1));
+              await unlockNextLevel(chapterId, levelId);
+              await clearActiveSession(chapterId, levelId);
+              handleNextLevel();
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (!levelData) {
     return <ErrorState levelId={levelId} onBack={() => navigation.goBack()} />;
   }
@@ -113,11 +203,17 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     : `board-${chapterId}-${levelId}`;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: uiTheme.background }]} edges={["top", "bottom"]}>
-      {/* Fixed Navigation Header Bar */}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: uiTheme.background }]}
+      edges={["top", "bottom"]}
+    >
+      {/* Header Bar */}
       <View style={[styles.headerBar, { borderColor: uiTheme.border }]}>
         <TouchableOpacity
-          style={[styles.backBtn, { backgroundColor: uiTheme.surface, borderColor: uiTheme.border }]}
+          style={[
+            styles.backBtn,
+            { backgroundColor: uiTheme.surface, borderColor: uiTheme.border },
+          ]}
           onPress={() => navigation.goBack()}
           activeOpacity={0.8}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -129,9 +225,23 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           {daily ? "Daily Challenge" : `Chapter ${chapterId} • Level ${levelId}`}
         </Text>
 
-        <View style={{ width: 36 }} />
+        {/* Quick Hint Action Pill */}
+        <TouchableOpacity
+          style={[
+            styles.hintPill,
+            { backgroundColor: uiTheme.surface, borderColor: uiTheme.border },
+          ]}
+          onPress={handleUseHint}
+          activeOpacity={0.7}
+        >
+          <FontAwesome name="lightbulb-o" size={15} color={uiTheme.star} />
+          <Text style={[styles.hintText, { color: uiTheme.textPrimary }]}>
+            {hints}
+          </Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Board Container */}
       <View style={styles.boardContainer}>
         <PuzzleBoard
           key={boardKey}
@@ -142,19 +252,64 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           onNextLevel={handleNextLevel}
           forcedReset={forcedReset}
           daily={daily}
+          hintTrigger={hintTrigger}
         />
+      </View>
+
+      {/* Power-Up Action Bar */}
+      <View style={[styles.actionBar, { borderColor: uiTheme.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.powerupButton,
+            { backgroundColor: uiTheme.surface, borderColor: uiTheme.border },
+          ]}
+          onPress={handleUseHint}
+          activeOpacity={0.8}
+        >
+          <FontAwesome name="lightbulb-o" size={18} color={uiTheme.star} />
+          <Text style={[styles.powerupText, { color: uiTheme.textPrimary }]}>
+            Hint ({hints})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.powerupButton,
+            { backgroundColor: uiTheme.surface, borderColor: uiTheme.border },
+          ]}
+          onPress={handleUseSkip}
+          activeOpacity={0.8}
+        >
+          <FontAwesome name="forward" size={16} color={uiTheme.primary} />
+          <Text style={[styles.powerupText, { color: uiTheme.textPrimary }]}>
+            Skip ({skipCount})
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const ErrorState = ({ levelId, onBack }: { levelId: number; onBack: () => void }) => {
+const ErrorState = ({
+  levelId,
+  onBack,
+}: {
+  levelId: number;
+  onBack: () => void;
+}) => {
   const { ui: uiTheme } = useTheme();
   return (
     <View style={[styles.errorContainer, { backgroundColor: uiTheme.background }]}>
-      <Text style={[styles.errorText, { color: uiTheme.danger }]}>Level {levelId} not found!</Text>
-      <TouchableOpacity style={[styles.backButton, { backgroundColor: uiTheme.primary }]} onPress={onBack}>
-        <Text style={{ color: uiTheme.onPrimary, fontWeight: "bold" }}>Go Back</Text>
+      <Text style={[styles.errorText, { color: uiTheme.danger }]}>
+        Level {levelId} not found!
+      </Text>
+      <TouchableOpacity
+        style={[styles.backButton, { backgroundColor: uiTheme.primary }]}
+        onPress={onBack}
+      >
+        <Text style={{ color: uiTheme.onPrimary, fontWeight: "bold" }}>
+          Go Back
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -185,8 +340,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     ...shadows.sm,
   },
+  hintPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    minWidth: 44,
+    justifyContent: "center",
+    ...shadows.sm,
+  },
+  hintText: {
+    ...typography.caption,
+    fontWeight: "700",
+  },
   boardContainer: {
     flex: 1,
+  },
+  actionBar: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderTopWidth: 1,
+  },
+  powerupButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    ...shadows.sm,
+  },
+  powerupText: {
+    ...typography.caption,
+    fontWeight: "700",
   },
   errorContainer: {
     flex: 1,
