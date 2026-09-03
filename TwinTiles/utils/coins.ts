@@ -55,3 +55,13 @@ export const incrementEffect = async (effect: string, by = 1): Promise<void> => 
   map[effect] = (map[effect] ?? 0) + by;
   await AsyncStorage.setItem(KEYS.EFFECTS, JSON.stringify(map));
 };
+
+export const consumeEffect = async (effect: string, count = 1): Promise<boolean> => {
+  const map = await getParsed<Record<string, number>>(KEYS.EFFECTS, {});
+  const current = map[effect] ?? 0;
+  if (current < count) return false;
+  
+  map[effect] = current - count;
+  await AsyncStorage.setItem(KEYS.EFFECTS, JSON.stringify(map));
+  return true;
+};

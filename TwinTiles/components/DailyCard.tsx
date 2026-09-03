@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, memo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
@@ -27,13 +27,18 @@ function DailyCard({ onPlay }: Props) {
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const [solved, setSolved] = useState<boolean | null>(null);
-  const [tickMS, setTickMS] = useState<number>(msUntilTomorrow());
+  const [tickMS, setTickMs] = useState<number>(msUntilTomorrow());
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let isSubscribed = true;
-    hasSolvedToday().then((s) => {
-      if (isSubscribed) setSolved(s);
-    });
+    hasSolvedToday()
+      .then((s) => {
+        if (isSubscribed) setSolved(s);
+      })
+      .catch((err) => {
+        if (isSubscribed) setError(err);
+      });
     return () => {
       isSubscribed = false;
     };
@@ -41,9 +46,20 @@ function DailyCard({ onPlay }: Props) {
 
   useEffect(() => {
     if (solved !== true) return;
-    const id = setInterval(() => setTickMS(msUntilTomorrow()), 60_000);
+    const id = setInterval(() => setTickMs(msUntilTomorrow()), 60_000);
     return () => clearInterval(id);
   }, [solved]);
+
+  if (error) {
+    return (
+      <View style={[styles.card, styles.cardError]}>
+        <FontAwesome5 name="exclamation-circle" size={20} color={uiTheme.danger} />
+        <View style={styles.textBlock}>
+          <Text style={styles.errorMessage}>Failed to load daily status</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (solved === null) return null;
 
@@ -71,7 +87,7 @@ function DailyCard({ onPlay }: Props) {
           Today's puzzle
         </Text>
         <Text style={[styles.subtitle, { color: uiTheme.onPrimary, opacity: 0.85 }]}>
-          One 6x6 board, 30 coin reward
+          One 6x6 board, 20 coin reward
         </Text>
       </View>
       <FontAwesome5 name="chevron-right" size={16} color={uiTheme.onPrimary} />
@@ -79,7 +95,7 @@ function DailyCard({ onPlay }: Props) {
   );
 }
 
-export default memo(DailyCard);
+export default DailyCard;
 
 const makeStyles = (uiTheme: UITheme) =>
   StyleSheet.create({
@@ -103,6 +119,10 @@ const makeStyles = (uiTheme: UITheme) =>
       backgroundColor: uiTheme.surface,
       borderColor: uiTheme.border,
     },
+    cardError: {
+      backgroundColor: uiTheme.surface,
+      borderColor: uiTheme.danger,
+    },
     textBlock: { flex: 1 },
     title: {
       ...typography.title,
@@ -113,5 +133,10 @@ const makeStyles = (uiTheme: UITheme) =>
       ...typography.caption,
       color: uiTheme.textMuted,
       marginTop: 2,
+    },
+    errorMessage: {
+      ...typography.body,
+      fontSize: 14,
+      color: uiTheme.danger,
     },
   });

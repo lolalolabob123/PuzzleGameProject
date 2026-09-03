@@ -1,118 +1,158 @@
-import React, { useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Alert } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { FontAwesome } from "@expo/vector-icons"
+import React, { useState, useMemo } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  Alert,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { FontAwesome } from "@expo/vector-icons";
 
-import { useProfile } from "../context/ProfileContext"
-import { AVAILABLE_AVATARS } from "../data/avatars"
-import { useTheme } from "../context/ThemeContext"
-import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme"
-import { DEFAULT_PROFILE } from "../utils/profile" // <-- Import DEFAULT_PROFILE
+import { useProfile } from "../context/ProfileContext";
+import { AVAILABLE_AVATARS } from "../data/avatars";
+import { useTheme } from "../context/ThemeContext";
+import {
+  spacing,
+  radii,
+  typography,
+  shadows,
+  UITheme,
+} from "../constants/uiTheme";
+import { DEFAULT_PROFILE } from "../utils/profile";
 
 type Props = {
-    initialName?: string;
-    initialAvatarId?: string;
-    onComplete?: () => void;
-    isEditing?: boolean;
-}
+  initialName?: string;
+  initialAvatarId?: string;
+  onComplete?: () => void;
+  isEditing?: boolean;
+};
 
 export default function ProfileSetup({
-    initialName = "",
-    initialAvatarId,
-    onComplete,
-    isEditing = false,
+  initialName,
+  initialAvatarId,
+  onComplete,
+  isEditing = false,
 }: Props) {
-    const { ui: uiTheme } = useTheme()
-    const styles = React.useMemo(() => makeStyles(uiTheme), [uiTheme])
-    
-    // 1. Get profile from context
-    const { profile, updateProfile } = useProfile()
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
-    const [name, setName] = useState(initialName)
-    const [selectedAvatarId, setSelectedAvatarId] = useState<string>(
-        initialAvatarId ?? AVAILABLE_AVATARS[0].id
-    )
+  const { profile, updateProfile } = useProfile();
 
-    const handleSave = async () => {
-        const trimmed = name.trim()
-        if (trimmed.length === 0) {
-            Platform.OS === "web"
-                ? window.alert("Please enter a name")
-                : Alert.alert("Missing name", "Please enter a name")
-            return
-        }
-        if (trimmed.length > 20) {
-            Platform.OS === "web"
-                ? window.alert("Name must be 20 characters or fewer")
-                : Alert.alert("Too long", "Name must be 20 characters or fewer")
-            return
-        }
+  // Fallback state initialization to context profile if initial props are omitted
+  const [name, setName] = useState(
+    initialName ?? profile?.name ?? ""
+  );
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>(
+    initialAvatarId ?? profile?.avatarId ?? AVAILABLE_AVATARS[0]?.id
+  );
 
-        // 2. Spread existing profile or fallback to DEFAULT_PROFILE
-        const baseProfile = profile ?? DEFAULT_PROFILE;
-
-        await updateProfile({
-            ...baseProfile,
-            name: trimmed,
-            avatarId: selectedAvatarId,
-        });
-
-        onComplete?.()
+  const handleSave = async () => {
+    const trimmed = name.trim();
+    if (trimmed.length === 0) {
+      if (Platform.OS === "web") {
+        window.alert("Please enter a name");
+      } else {
+        Alert.alert("Missing name", "Please enter a name");
+      }
+      return;
+    }
+    if (trimmed.length > 20) {
+      if (Platform.OS === "web") {
+        window.alert("Name must be 20 characters or fewer");
+      } else {
+        Alert.alert("Too long", "Name must be 20 characters or fewer");
+      }
+      return;
     }
 
-    return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
-            <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
-                <Text style={styles.title}>
-                    {isEditing ? "Edit Profile" : "Welcome!"}
-                </Text>
-                <Text style={styles.subtitle}>
-                    {isEditing ? "Update your name and avatar." : "Let's set up your profile."}
-                </Text>
-                <Text style={styles.sectionLabel}>Your name</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter your name"
-                    placeholderTextColor={uiTheme.textMuted}
-                    value={name}
-                    onChangeText={setName}
-                    maxLength={20}
-                    autoFocus={!isEditing}
-                />
+    const baseProfile = profile ?? DEFAULT_PROFILE;
 
-                <Text style={styles.sectionLabel}>Choose an avatar</Text>
-                <View style={styles.avatarGrid}>
-                    {AVAILABLE_AVATARS.map((avatar) => {
-                        const isSelected = avatar.id === selectedAvatarId
-                        return (
-                            <TouchableOpacity
-                                key={avatar.id}
-                                onPress={() => setSelectedAvatarId(avatar.id)}
-                                style={[
-                                    styles.avatarCircle,
-                                    {backgroundColor: avatar.color},
-                                    isSelected && styles.avatarSelected,
-                                ]}
-                                activeOpacity={0.85}
-                                >
-                                    <FontAwesome name={avatar.iconName as any} size={28} color="#FFFFFF"/>
-                                </TouchableOpacity>
-                        )
-                    })}
-                </View>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
-                    <Text style={styles.saveButtonText}>
-                        {isEditing ? "Save Changes" : "Get Started"}
-                    </Text>
-                </TouchableOpacity>
-                {isEditing && (
-                    <TouchableOpacity style={styles.cancelButton} onPress={onComplete} activeOpacity={0.85}>
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                )}
-            </ScrollView>
-        </SafeAreaView>
-    )
+    await updateProfile({
+      ...baseProfile,
+      name: trimmed,
+      avatarId: selectedAvatarId,
+    });
+
+    onComplete?.();
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <ScrollView
+        contentContainerStyle={styles.scrollBody}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>
+          {isEditing ? "Edit Profile" : "Welcome!"}
+        </Text>
+        <Text style={styles.subtitle}>
+          {isEditing
+            ? "Update your name and avatar."
+            : "Let's set up your profile."}
+        </Text>
+
+        <Text style={styles.sectionLabel}>Your name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your name"
+          placeholderTextColor={uiTheme.textMuted}
+          value={name}
+          onChangeText={setName}
+          maxLength={20}
+          autoFocus={!isEditing}
+        />
+
+        <Text style={styles.sectionLabel}>Choose an avatar</Text>
+        <View style={styles.avatarGrid}>
+          {AVAILABLE_AVATARS.map((avatar) => {
+            const isSelected = avatar.id === selectedAvatarId;
+            return (
+              <TouchableOpacity
+                key={avatar.id}
+                onPress={() => setSelectedAvatarId(avatar.id)}
+                style={[
+                  styles.avatarCircle,
+                  { backgroundColor: avatar.color },
+                  isSelected && styles.avatarSelected,
+                ]}
+                activeOpacity={0.85}
+              >
+                <FontAwesome
+                  name={avatar.iconName as any}
+                  size={28}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSave}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.saveButtonText}>
+            {isEditing ? "Save Changes" : "Get Started"}
+          </Text>
+        </TouchableOpacity>
+
+        {isEditing && (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={onComplete}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
 
 const makeStyles = (uiTheme: UITheme) =>

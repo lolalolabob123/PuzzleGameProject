@@ -1,19 +1,21 @@
+import { ImageSourcePropType } from "react-native";
+
 export type ShopItemCategory = "theme" | "powerup" | "cosmetic";
 
-export interface ShopItem {
+export  interface ShopItem {
   id: string;
   category: ShopItemCategory;
   name: string;
   description?: string;
   price: number;
   iconName?: string;
-  image?: any;
+  image?: ImageSourcePropType;
   consumable?: boolean;
   effect?: string;
 }
 
 export const SHOP_ITEMS: ShopItem[] = [
-  {
+{
     id: "storm",
     category: "theme",
     name: "Storm Set",
@@ -75,4 +77,4 @@ export const SHOP_ITEMS: ShopItem[] = [
     consumable: true,
     effect: "skip-tokens",
   },
-];
+]

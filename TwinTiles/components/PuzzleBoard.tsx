@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { View, Text, TouchableOpacity, Modal, Animated, StyleSheet, Dimensions } from "react-native";
+import { View, Text, TouchableOpacity, Modal, Animated, StyleSheet, Dimensions, Alert, Platform } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics"; // Optional: gracefully falls back if not installed
+import * as Haptics from "expo-haptics";
+import { getHintsCount, consumeHint } from "../utils/hints";
+import { initAudio, playSound } from "../utils/audio";
 import { useTheme } from "../context/ThemeContext";
 import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
 import {
@@ -12,6 +14,7 @@ import {
   unlockNextLevel,
   saveLevelStars,
 } from "../utils/progress";
+import { useIsFocused } from "@react-navigation/native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const TILE_MARGIN = 2;
@@ -38,6 +41,97 @@ interface PuzzleBoardProps {
   daily?: boolean;
 }
 
+function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[], voids?: number[]): number[] | null {
+  const target = Math.floor(size / 2);
+  const isVoid = (i: number) => voids?.includes(i) ?? false;
+
+  function isValid(g: number[]): boolean {
+    for (let r = 0; r < size; r++) {
+      let r1 = 0, r2 = 0;
+      for (let c = 0; c < size; c++) {
+        const idx = r * size + c;
+        if (isVoid(idx)) continue;
+        const val = g[idx];
+        if (val === 1) r1++;
+        if (val === 2) r2++;
+        if (r1 > target || r2 > target) return false;
+
+        if (c >= 2) {
+          const i1 = r * size + (c - 2), i2 = r * size + (c - 1), i3 = idx;
+          if (!isVoid(i1) && !isVoid(i2) && !isVoid(i3)) {
+            if (g[i1] !== 0 && g[i1] === g[i2] && g[i2] === g[i3]) return false;
+          }
+        }
+      }
+    }
+
+    for (let c = 0; c < size; c++) {
+      let c1 = 0, c2 = 0;
+      for (let r = 0; r < size; r++) {
+        const idx = r * size + c;
+        if (isVoid(idx)) continue;
+        const val = g[idx];
+        if (val === 1) c1++;
+        if (val === 2) c2++;
+        if (c1 > target || c2 > target) return false;
+
+        if (r >= 2) {
+          const i1 = (r - 2) * size + c, i2 = (r - 1) * size + c, i3 = idx;
+          if (!isVoid(i1) && !isVoid(i2) && !isVoid(i3)) {
+            if (g[i1] !== 0 && g[i1] === g[i2] && g[i2] === g[i3]) return false;
+          }
+        }
+      }
+    }
+
+    if (linkedPairs && Array.isArray(linkedPairs)) {
+      for (const pair of linkedPairs) {
+        let a: number | undefined, b: number | undefined, type = "equal";
+        if (Array.isArray(pair)) {
+          a = pair[0];
+          b = pair[1];
+        } else if (typeof pair === "object" && pair !== null) {
+          a = pair.idx1 ?? pair.cell1 ?? pair.a ?? pair.from;
+          b = pair.idx2 ?? pair.cell2 ?? pair.b ?? pair.to;
+          if (pair.type) type = pair.type;
+        }
+
+        if (a !== undefined && b !== undefined) {
+          const v1 = g[a], v2 = g[b];
+          if (v1 !== 0 && v2 !== 0) {
+            if (type === "equal" && v1 !== v2) return false;
+            if (type === "opposite" && v1 === v2) return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  function backtrack(g: number[], idx: number): number[] | null {
+    if (idx === g.length) {
+      return isValid(g) ? g : null;
+    }
+
+    if (g[idx] !== 0 || isVoid(idx)) {
+      return backtrack(g, idx + 1);
+    }
+
+    for (const val of [1, 2]) {
+      g[idx] = val;
+      if (isValid(g)) {
+        const res = backtrack(g, idx + 1);
+        if (res) return res;
+      }
+    }
+    g[idx] = 0;
+    return null;
+  }
+
+  return backtrack([...initialGrid], 0);
+}
+
 export default function PuzzleBoard({
   levelData,
   chapterId,
@@ -55,6 +149,9 @@ export default function PuzzleBoard({
   const [isWon, setIsWon] = useState<boolean>(false);
   const [starCount, setStarCount] = useState<number>(3);
   const [hintedIndex, setHintedIndex] = useState<number | null>(null);
+  const [errorIndex, setErrorIndex] = useState<number | null>(null);
+  const isFocused = useIsFocused();
+  const [hintsCount, setHintsCount] = useState<number>(0);
 
   const starAnims = useRef([
     new Animated.Value(0),
@@ -62,14 +159,111 @@ export default function PuzzleBoard({
     new Animated.Value(0),
   ]).current;
 
-  // Trigger haptic feedback helper
+  // Initialize audio module on mount
+  useEffect(() => {
+    initAudio();
+  }, []);
+
+  const solutionGrid = useMemo(() => {
+    return solvePuzzleGrid(levelData.grid, size, levelData.linkedPairs, levelData.voids);
+  }, [levelData.grid, size, levelData.linkedPairs, levelData.voids]);
+
   const triggerHaptic = (type: "light" | "medium" | "success") => {
     try {
       if (type === "light") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (type === "medium") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (type === "success") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      // Ignore if native haptics module is unavailable
+      // Native haptics fallback
+    }
+  };
+
+  const refreshHints = useCallback(async () => {
+    const count = await getHintsCount();
+    setHintsCount(count);
+  }, []);
+
+  useEffect(() => {
+    if (isFocused) {
+      refreshHints();
+    }
+  }, [isFocused, refreshHints]);
+
+  const isFixedIndex = useCallback((idx: number) => levelData.grid[idx] !== 0, [levelData.grid]);
+  const isVoidIndex = useCallback((idx: number) => levelData.voids?.includes(idx) ?? false, [levelData.voids]);
+
+  const handleHintPress = async () => {
+    if (isWon) return;
+
+    if (hintsCount <= 0) {
+      triggerHaptic("medium");
+      playSound("undo");
+      const msg = "You have no hints left. Visit the shop to get more!";
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("No Hints", msg);
+      return;
+    }
+
+    if (!solutionGrid) return;
+
+    // Check for user mistakes first
+    let firstErrorIdx = -1;
+    for (let i = 0; i < grid.length; i++) {
+      if (isFixedIndex(i) || isVoidIndex(i)) continue;
+      if (grid[i] !== 0 && grid[i] !== solutionGrid[i]) {
+        firstErrorIdx = i;
+        break;
+      }
+    }
+
+    if (firstErrorIdx !== -1) {
+      const success = await consumeHint();
+      if (success) {
+        await refreshHints();
+        triggerHaptic("medium");
+        playSound("hint");
+
+        setHistory((prev) => [...prev, grid]);
+        const updatedGrid = [...grid];
+        updatedGrid[firstErrorIdx] = 0;
+        setGrid(updatedGrid);
+
+        setErrorIndex(firstErrorIdx);
+        setTimeout(() => setErrorIndex(null), 1800);
+      }
+      return;
+    }
+
+    // Auto-fill the next empty cell
+    const firstEmptyIdx = grid.findIndex((v, i) => v === 0 && !isVoidIndex(i));
+    if (firstEmptyIdx === -1) return;
+
+    const success = await consumeHint();
+    if (success) {
+      await refreshHints();
+      triggerHaptic("light");
+      playSound("hint");
+
+      setHistory((prev) => [...prev, grid]);
+      const updatedGrid = [...grid];
+      updatedGrid[firstEmptyIdx] = solutionGrid[firstEmptyIdx];
+
+      setGrid(updatedGrid);
+      setMoves((m) => m + 1);
+
+      setHintedIndex(firstEmptyIdx);
+      setTimeout(() => setHintedIndex(null), 1800);
+
+      await saveActiveSession({
+        chapterId,
+        levelId: level,
+        grid: updatedGrid,
+        moves: moves + 1,
+      });
+
+      if (checkIsWon(updatedGrid)) {
+        handleWinSequence(updatedGrid, moves + 1);
+      }
     }
   };
 
@@ -108,9 +302,6 @@ export default function PuzzleBoard({
     })();
     return () => { active = false; };
   }, [levelData, chapterId, level, forcedReset]);
-
-  const isFixedIndex = useCallback((idx: number) => levelData.grid[idx] !== 0, [levelData.grid]);
-  const isVoidIndex = useCallback((idx: number) => levelData.voids?.includes(idx) ?? false, [levelData.voids]);
 
   const initialEmptyCount = useMemo(() => {
     return levelData.grid.filter((val, idx) => val === 0 && !isVoidIndex(idx)).length;
@@ -203,7 +394,6 @@ export default function PuzzleBoard({
     const isFilled = !currentGrid.some((val, i) => val === 0 && !isVoidIndex(i));
     if (!isFilled) return false;
 
-    // Consecutive 3 Check (Rows)
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size - 2; c++) {
         const i1 = r * size + c, i2 = r * size + (c + 1), i3 = r * size + (c + 2);
@@ -214,7 +404,6 @@ export default function PuzzleBoard({
       }
     }
 
-    // Consecutive 3 Check (Columns)
     for (let c = 0; c < size; c++) {
       for (let r = 0; r < size - 2; r++) {
         const i1 = r * size + c, i2 = (r + 1) * size + c, i3 = (r + 2) * size + c;
@@ -225,7 +414,6 @@ export default function PuzzleBoard({
       }
     }
 
-    // Linked Pairs Validation
     if (levelData.linkedPairs && Array.isArray(levelData.linkedPairs)) {
       for (const pair of levelData.linkedPairs) {
         let idx1: number | undefined, idx2: number | undefined, expectedType = "equal";
@@ -251,11 +439,43 @@ export default function PuzzleBoard({
     return true;
   };
 
+  const handleWinSequence = async (finalGrid: number[], finalMoves: number) => {
+    setIsWon(true);
+    triggerHaptic("success");
+    playSound("win");
+
+    const par = estimatedOptionalMoves;
+    const stars =
+      finalMoves <= par + 3
+        ? 3
+        : finalMoves <= par + Math.max(6, Math.floor(par * 0.5))
+        ? 2
+        : 1;
+
+    setStarCount(stars);
+
+    await unlockNextLevel(chapterId, level);
+    await saveLevelStars(chapterId, level, stars);
+    await clearActiveSession(chapterId, level);
+
+    starAnims.forEach((anim, i) => {
+      anim.setValue(0);
+      Animated.spring(anim, {
+        toValue: 1,
+        tension: 50,
+        friction: 3,
+        useNativeDriver: true,
+        delay: i * 150,
+      }).start();
+    });
+  };
+
   const handleTilePress = async (index: number) => {
-    // Touch guard: do nothing if cell is fixed, void, or level is already completed
     if (isFixedIndex(index) || isVoidIndex(index) || isWon) return;
 
     triggerHaptic("light");
+    playSound("tilePlace");
+
     setHistory((prev) => [...prev, grid]);
 
     const nextVal = (grid[index] + 1) % 3;
@@ -280,40 +500,16 @@ export default function PuzzleBoard({
     await saveActiveSession({ chapterId, levelId: level, grid: nextGrid, moves: newMoves });
 
     if (checkIsWon(nextGrid)) {
-      setIsWon(true);
-      triggerHaptic("success");
-
-      const par = estimatedOptionalMoves;
-      const stars =
-        newMoves <= par + 3
-          ? 3
-          : newMoves <= par + Math.max(6, Math.floor(par * 0.5))
-          ? 2
-          : 1;
-
-      setStarCount(stars);
-
-      // FIXED: Pass `level` (current level solved), NOT `level + 1`
-      await unlockNextLevel(chapterId, level);
-      await saveLevelStars(chapterId, level, stars);
-      await clearActiveSession(chapterId, level);
-
-      starAnims.forEach((anim, i) => {
-        anim.setValue(0);
-        Animated.spring(anim, {
-          toValue: 1,
-          tension: 50,
-          friction: 3,
-          useNativeDriver: true,
-          delay: i * 150,
-        }).start();
-      });
+      handleWinSequence(nextGrid, newMoves);
     }
   };
 
   const handleUndo = async () => {
     if (history.length === 0 || isWon) return;
+
     triggerHaptic("medium");
+    playSound("undo");
+
     const previousGrid = history[history.length - 1];
     setGrid(previousGrid);
     setHistory((prev) => prev.slice(0, -1));
@@ -324,21 +520,14 @@ export default function PuzzleBoard({
 
   const handleRestart = async () => {
     if (isWon) return;
+
     triggerHaptic("medium");
+    playSound("undo");
+
     setGrid([...levelData.grid]);
     setHistory([]);
     setMoves(0);
     await clearActiveSession(chapterId, level);
-  };
-
-  const handleHint = () => {
-    if (isWon) return;
-    triggerHaptic("light");
-    const firstEmpty = grid.findIndex((v, i) => v === 0 && !isVoidIndex(i));
-    if (firstEmpty !== -1) {
-      setHintedIndex(firstEmpty);
-      setTimeout(() => setHintedIndex(null), 1800);
-    }
   };
 
   return (
@@ -390,6 +579,7 @@ export default function PuzzleBoard({
                         val === 2 && styles.tileTwo,
                         isFixed && styles.tileFixed,
                         hintedIndex === idx && styles.tileHinted,
+                        errorIndex === idx && styles.tileError,
                       ]}
                     >
                       {val !== 0 && (
@@ -442,9 +632,11 @@ export default function PuzzleBoard({
           <Text style={[styles.controlBtnText, isWon && styles.controlBtnTextDisabled]}>Restart</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.controlBtn, isWon && styles.controlBtnDisabled]} onPress={handleHint} disabled={isWon}>
-          <FontAwesome name="lightbulb-o" size={16} color={isWon ? uiTheme.textDisabled : uiTheme.warning} />
-          <Text style={[styles.controlBtnText, { color: isWon ? uiTheme.textDisabled : uiTheme.warning }]}>Hint</Text>
+        <TouchableOpacity style={[styles.controlBtn, (isWon || hintsCount <= 0) && styles.controlBtnDisabled]} onPress={handleHintPress} disabled={isWon}>
+          <FontAwesome name="lightbulb-o" size={16} color={isWon || hintsCount <= 0 ? uiTheme.textDisabled : uiTheme.warning} />
+          <Text style={[styles.controlBtnText, { color: isWon || hintsCount <= 0 ? uiTheme.textDisabled : uiTheme.warning }]}>
+            Hint ({hintsCount})
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -543,6 +735,10 @@ const makeStyles = (uiTheme: UITheme) =>
     tileHinted: {
       borderWidth: 3,
       borderColor: uiTheme.warning,
+    },
+    tileError: {
+      borderWidth: 3,
+      borderColor: uiTheme.danger ?? "#E53E3E",
     },
     tileText: {
       ...typography.title,

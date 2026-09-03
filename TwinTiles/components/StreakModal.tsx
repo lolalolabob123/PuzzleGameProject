@@ -1,43 +1,42 @@
-import React, {useMemo} from "react"
-import {Modal, View, Text, TouchableOpacity, StyleSheet} from "react-native"
-import {FontAwesome, FontAwesome5} from "@expo/vector-icons"
-import { useTheme } from "../context/ThemeContext"
-import {spacing, radii, typography, shadows, UITheme} from "../constants/uiTheme"
-import { useEffect } from "react"
-import { playSound } from "../utils/audio"
+import React, { useMemo, useEffect } from "react";
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
+import { playSound } from "../utils/audio";
 
 type Props = {
-    streak: number;
-    reward: number;
-    onClose: () => void;
-}
+  streak: number;
+  reward: number;
+  onClose: () => void;
+};
 
-export default function StreakModal({streak, reward, onClose}: Props) {
-    const {ui: uiTheme} = useTheme()
-    const styles = useMemo(() => makeStyles(uiTheme), [uiTheme])
+export default function StreakModal({ streak, reward, onClose }: Props) {
+  const { ui: uiTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
-    useEffect(() => {
-        playSound("streak")
-    }, [])
+  useEffect(() => {
+    playSound("streak");
+  }, []);
 
-    return (
-        <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-            <View style={styles.overlay}>
-                <View style={styles.card}>
-                    <FontAwesome5 name="fire" size={56} color={uiTheme.warning}/>
-                    <Text style={styles.dayLabel}> Day {streak}</Text>
-                    <Text style={styles.subtitle}>Daily Streak</Text>
-                    <View style={styles.rewardPill}>
-                        <FontAwesome5 name="coins" size={16} color={uiTheme.star}/>
-                        <Text style={styles.rewardText}>+{reward}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.button} onPress={onClose} activeOpacity={0.85}>
-                        <Text style={styles.buttonText}>Let's Play</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </Modal>
-    )
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <FontAwesome5 name="fire" size={56} color={uiTheme.warning} />
+          <Text style={styles.dayLabel}>Day {streak}</Text>
+          <Text style={styles.subtitle}>Daily Streak</Text>
+          <View style={styles.rewardPill}>
+            <FontAwesome5 name="coins" size={16} color={uiTheme.star} />
+            <Text style={styles.rewardText}>+{reward}</Text>
+          </View>
+          <TouchableOpacity style={styles.button} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.buttonText}>Let's Play</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 const makeStyles = (uiTheme: UITheme) =>
