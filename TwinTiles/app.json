@@ -20,7 +20,7 @@
         "backgroundColor": "#D9D9D9"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.lolalolabob.TwinTiles",
+      "package": "com.callumcandy.twinTiles",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
