@@ -280,7 +280,7 @@ const HowToPlay = ({ onClose }: { onClose: () => void }) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
   return (
-    <View style={styles.settingsPage}>
+    <SafeAreaView>
       <View style={styles.settingsHeader}>
         <Text style={styles.settingsTitle}>How to Play</Text>
         <TouchableOpacity onPress={onClose}>
@@ -305,7 +305,7 @@ const HowToPlay = ({ onClose }: { onClose: () => void }) => {
           detail="Solve the puzzle in as few moves as possible to earn 3 stars!"
         />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -359,7 +359,7 @@ const SettingsContent = ({
   };
 
   return (
-    <View style={styles.settingsPage}>
+    <SafeAreaView style={styles.settingsPage}>
       <View style={styles.settingsHeader}>
         <Text style={styles.settingsTitle}>Settings</Text>
         <TouchableOpacity onPress={onClose}>
@@ -469,7 +469,7 @@ const SettingsContent = ({
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -589,7 +589,7 @@ const makeStyles = (uiTheme: UITheme) =>
       flex: 1,
       backgroundColor: uiTheme.background,
       paddingHorizontal: spacing.xl,
-      paddingTop: spacing.lg,
+      paddingTop: Platform.OS === "android" ? spacing.sm : spacing.lg,
     },
     settingsHeader: {
       flexDirection: "row",

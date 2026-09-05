@@ -27,10 +27,10 @@
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF",
-          "imageWidth": 280,
+          "imageWidth": 450,
           "android": {
             "image": "./assets/splash-icon.png",
-            "imageWidth": 280
+            "imageWidth": 450
           }
         }
       ]

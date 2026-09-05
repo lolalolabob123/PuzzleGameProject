@@ -225,20 +225,8 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           {daily ? "Daily Challenge" : `Chapter ${chapterId} • Level ${levelId}`}
         </Text>
 
-        {/* Quick Hint Action Pill */}
-        <TouchableOpacity
-          style={[
-            styles.hintPill,
-            { backgroundColor: uiTheme.surface, borderColor: uiTheme.border },
-          ]}
-          onPress={handleUseHint}
-          activeOpacity={0.7}
-        >
-          <FontAwesome name="lightbulb-o" size={15} color={uiTheme.star} />
-          <Text style={[styles.hintText, { color: uiTheme.textPrimary }]}>
-            {hints}
-          </Text>
-        </TouchableOpacity>
+        {/* Empty placeholder view to keep header title centered */}
+        <View style={{ width: 36 }} />
       </View>
 
       {/* Board Container */}
@@ -339,22 +327,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     ...shadows.sm,
-  },
-  hintPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    minWidth: 44,
-    justifyContent: "center",
-    ...shadows.sm,
-  },
-  hintText: {
-    ...typography.caption,
-    fontWeight: "700",
   },
   boardContainer: {
     flex: 1,
