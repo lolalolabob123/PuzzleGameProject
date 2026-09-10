@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { AVAILABLE_THEMES, GameTheme } from "../constants/themes";
 import { useTheme } from "../context/ThemeContext";
@@ -28,6 +28,7 @@ import { isAudioEnabled, setAudioEnabled } from "../utils/audio";
 import { isHapticsEnabled, setHapticsEnabled } from "../utils/haptics";
 import DailyCard from "../components/DailyCard";
 import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 if (Platform.OS === "web") {
   const originalWarn = console.warn;
@@ -270,6 +271,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           }}
           onResetChapter={handleResetChapter}
           onFullReset={handleFullReset}
+          navigation={navigation}
         />
       </Modal>
     </SafeAreaView>
@@ -330,6 +332,7 @@ type SettingsContentProps = {
   onEditProfile: () => void;
   onResetChapter: () => void;
   onFullReset: () => void;
+  navigation: HomeScreenProps["navigation"];
 };
 
 const SettingsContent = ({
@@ -342,6 +345,7 @@ const SettingsContent = ({
   onEditProfile,
   onResetChapter,
   onFullReset,
+  navigation,
 }: SettingsContentProps) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
@@ -358,6 +362,24 @@ const SettingsContent = ({
     await setHapticsEnabled(value);
   };
 
+  // Replay Interactive Tutorial handler
+const handleReplayTutorial = async () => {
+    try {
+      await AsyncStorage.removeItem("@twintiles_tutorial_seen");
+      onClose();
+      setTimeout(() => {
+        navigation.navigate("Game", {
+          chapterId: 1,
+          levelId: 1,
+          themeIndex: AVAILABLE_THEMES.findIndex((t) => t.id === currentTheme.id),
+          forcedReset: true,
+        });
+      }, 150);
+    } catch (err) {
+      console.error("Error resetting tutorial flag:", err);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.settingsPage}>
       <View style={styles.settingsHeader}>
@@ -367,6 +389,7 @@ const SettingsContent = ({
         </TouchableOpacity>
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Profile Row */}
         <TouchableOpacity
           style={styles.profileRow}
           onPress={onEditProfile}
@@ -382,6 +405,7 @@ const SettingsContent = ({
           <FontAwesome name="chevron-right" size={16} color={uiTheme.textMuted} />
         </TouchableOpacity>
 
+        {/* Feedback Section */}
         <Text style={styles.sectionSubHeader}>Feedback</Text>
         <View style={styles.toggleCard}>
           <View style={styles.toggleRow}>
@@ -411,6 +435,24 @@ const SettingsContent = ({
           </View>
         </View>
 
+        {/* Help & Gameplay Section */}
+        <Text style={styles.sectionSubHeader}>Help & Gameplay</Text>
+        <View style={styles.toggleCard}>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={handleReplayTutorial}
+            activeOpacity={0.85}
+          >
+            <FontAwesome name="graduation-cap" size={18} color={uiTheme.primary} style={{ marginRight: spacing.md }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Replay Interactive Tutorial</Text>
+              <Text style={styles.toggleHint}>Play Level 1-1 with step-by-step guidance</Text>
+            </View>
+            <FontAwesome name="chevron-right" size={14} color={uiTheme.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Customise Appearance */}
         <Text style={styles.sectionSubHeader}>Customise Appearance</Text>
         <View style={styles.themeGrid}>
           {AVAILABLE_THEMES.map((theme, index) => {
@@ -452,6 +494,7 @@ const SettingsContent = ({
           })}
         </View>
 
+        {/* Data Section */}
         <Text style={styles.sectionSubHeader}>Data</Text>
         <View style={styles.toggleCard}>
           <TouchableOpacity style={styles.dangerRow} onPress={onResetChapter}>

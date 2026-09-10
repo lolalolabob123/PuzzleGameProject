@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, Dispatch, SetStateAction } from "react";
 import { View, Text, TouchableOpacity, Modal, Animated, StyleSheet, Dimensions, Alert, Platform } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -40,6 +40,9 @@ export interface PuzzleBoardProps {
   forcedReset?: boolean;
   daily?: boolean;
   hintTrigger?: number;
+  highlightCellIndex?: number | null;
+  onGridChange?: Dispatch<SetStateAction<number[]>>;
+  showControls?: boolean; // Prop to toggle internal controls bar
 }
 
 function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[], voids?: number[]): number[] | null {
@@ -47,44 +50,62 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
   const isVoid = (i: number) => voids?.includes(i) ?? false;
 
   function isValid(g: number[]): boolean {
-    // Check horizontal constraints (count and max 2 adjacent)
+    // Check horizontal constraints
     for (let r = 0; r < size; r++) {
       let r1 = 0, r2 = 0;
+      let consecutiveVal = 0;
+      let consecutiveCount = 0;
+
       for (let c = 0; c < size; c++) {
         const idx = r * size + c;
         if (isVoid(idx)) continue;
         const val = g[idx];
+
         if (val === 1) r1++;
         if (val === 2) r2++;
         if (r1 > target || r2 > target) return false;
 
-        // Check for 3-in-a-row horizontally
-        if (c >= 2) {
-          const i1 = r * size + (c - 2), i2 = r * size + (c - 1), i3 = idx;
-          if (!isVoid(i1) && !isVoid(i2) && !isVoid(i3)) {
-            if (g[i1] !== 0 && g[i1] === g[i2] && g[i2] === g[i3]) return false;
+        if (val !== 0) {
+          if (val === consecutiveVal) {
+            consecutiveCount++;
+            if (consecutiveCount >= 3) return false;
+          } else {
+            consecutiveVal = val;
+            consecutiveCount = 1;
           }
+        } else {
+          consecutiveVal = 0;
+          consecutiveCount = 0;
         }
       }
     }
 
-    // Check vertical constraints (count and max 2 adjacent)
+    // Check vertical constraints
     for (let c = 0; c < size; c++) {
       let c1 = 0, c2 = 0;
+      let consecutiveVal = 0;
+      let consecutiveCount = 0;
+
       for (let r = 0; r < size; r++) {
         const idx = r * size + c;
         if (isVoid(idx)) continue;
         const val = g[idx];
+
         if (val === 1) c1++;
         if (val === 2) c2++;
         if (c1 > target || c2 > target) return false;
 
-        // Check for 3-in-a-row vertically
-        if (r >= 2) {
-          const i1 = (r - 2) * size + c, i2 = (r - 1) * size + c, i3 = idx;
-          if (!isVoid(i1) && !isVoid(i2) && !isVoid(i3)) {
-            if (g[i1] !== 0 && g[i1] === g[i2] && g[i2] === g[i3]) return false;
+        if (val !== 0) {
+          if (val === consecutiveVal) {
+            consecutiveCount++;
+            if (consecutiveCount >= 3) return false;
+          } else {
+            consecutiveVal = val;
+            consecutiveCount = 1;
           }
+        } else {
+          consecutiveVal = 0;
+          consecutiveCount = 0;
         }
       }
     }
@@ -147,6 +168,9 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   forcedReset,
   daily = false,
   hintTrigger = 0,
+  highlightCellIndex = null,
+  onGridChange,
+  showControls = true,
 }) => {
   const { ui: uiTheme } = useTheme();
   const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
@@ -167,6 +191,14 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
+
+  // Sync grid changes with parent state handler when provided
+  const updateGridState = useCallback((newGrid: number[]) => {
+    setGrid(newGrid);
+    if (onGridChange) {
+      onGridChange(newGrid);
+    }
+  }, [onGridChange]);
 
   useEffect(() => {
     initAudio();
@@ -204,26 +236,43 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     const isFilled = !currentGrid.some((val, i) => val === 0 && !isVoidIndex(i));
     if (!isFilled) return false;
 
+    // Check horizontal contiguous matches
     for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size - 2; c++) {
-        const i1 = r * size + c, i2 = r * size + (c + 1), i3 = r * size + (c + 2);
-        if (isVoidIndex(i1) || isVoidIndex(i2) || isVoidIndex(i3)) continue;
-        if (currentGrid[i1] !== 0 && currentGrid[i1] === currentGrid[i2] && currentGrid[i2] === currentGrid[i3]) {
-          return false;
+      let consecutiveVal = 0;
+      let consecutiveCount = 0;
+      for (let c = 0; c < size; c++) {
+        const idx = r * size + c;
+        if (isVoidIndex(idx)) continue;
+        const val = currentGrid[idx];
+        if (val !== 0 && val === consecutiveVal) {
+          consecutiveCount++;
+          if (consecutiveCount >= 3) return false;
+        } else {
+          consecutiveVal = val;
+          consecutiveCount = val !== 0 ? 1 : 0;
         }
       }
     }
 
+    // Check vertical contiguous matches
     for (let c = 0; c < size; c++) {
-      for (let r = 0; r < size - 2; r++) {
-        const i1 = r * size + c, i2 = (r + 1) * size + c, i3 = (r + 2) * size + c;
-        if (isVoidIndex(i1) || isVoidIndex(i2) || isVoidIndex(i3)) continue;
-        if (currentGrid[i1] !== 0 && currentGrid[i1] === currentGrid[i2] && currentGrid[i2] === currentGrid[i3]) {
-          return false;
+      let consecutiveVal = 0;
+      let consecutiveCount = 0;
+      for (let r = 0; r < size; r++) {
+        const idx = r * size + c;
+        if (isVoidIndex(idx)) continue;
+        const val = currentGrid[idx];
+        if (val !== 0 && val === consecutiveVal) {
+          consecutiveCount++;
+          if (consecutiveCount >= 3) return false;
+        } else {
+          consecutiveVal = val;
+          consecutiveCount = val !== 0 ? 1 : 0;
         }
       }
     }
 
+    // Check linked pairs
     if (levelData.linkedPairs && Array.isArray(levelData.linkedPairs)) {
       for (const pair of levelData.linkedPairs) {
         let idx1: number | undefined, idx2: number | undefined, expectedType = "equal";
@@ -293,7 +342,6 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   const applyHintToBoard = useCallback(async () => {
     if (isWon || !solutionGrid) return;
 
-    // 1. Highlight user errors if present
     let firstErrorIdx = -1;
     for (let i = 0; i < grid.length; i++) {
       if (isFixedIndex(i) || isVoidIndex(i)) continue;
@@ -311,7 +359,6 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       return;
     }
 
-    // 2. Suggest first empty slot with translucent ghost text preview
     const firstEmptyIdx = grid.findIndex((v, i) => v === 0 && !isVoidIndex(i));
     if (firstEmptyIdx === -1) return;
 
@@ -374,21 +421,22 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         activeSession.levelId === level &&
         activeSession.grid.length === levelData.grid.length
       ) {
-        setGrid(activeSession.grid);
+        updateGridState(activeSession.grid);
         setMoves(activeSession.moves ?? 0);
         return;
       }
 
       const savedGrid = await getLevelState(chapterId, level);
       if (active) {
-        setGrid(savedGrid && savedGrid.length === levelData.grid.length ? savedGrid : [...levelData.grid]);
+        const nextGrid = savedGrid && savedGrid.length === levelData.grid.length ? savedGrid : [...levelData.grid];
+        updateGridState(nextGrid);
         setMoves(0);
         setHistory([]);
         setIsWon(false);
       }
     })();
     return () => { active = false; };
-  }, [levelData, chapterId, level, forcedReset]);
+  }, [levelData, chapterId, level, forcedReset, updateGridState]);
 
   const getLinkInfo = useCallback((idx1: number, idx2: number) => {
     const pairs = levelData.linkedPairs;
@@ -490,7 +538,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       }
     });
 
-    setGrid(nextGrid);
+    updateGridState(nextGrid);
     const newMoves = moves + 1;
     setMoves(newMoves);
 
@@ -508,7 +556,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     playSound("undo");
 
     const previousGrid = history[history.length - 1];
-    setGrid(previousGrid);
+    updateGridState(previousGrid);
     setHistory((prev) => prev.slice(0, -1));
     const newMoves = Math.max(0, moves - 1);
     setMoves(newMoves);
@@ -521,7 +569,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     triggerHaptic("medium");
     playSound("undo");
 
-    setGrid([...levelData.grid]);
+    updateGridState([...levelData.grid]);
     setHistory([]);
     setMoves(0);
     await clearActiveSession(chapterId, level);
@@ -577,6 +625,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
                         isFixed && styles.tileFixed,
                         hintedIndex === idx && styles.tileHinted,
                         errorIndex === idx && styles.tileError,
+                        highlightCellIndex === idx && styles.tileHinted,
                       ]}
                     >
                       {val !== 0 ? (
@@ -619,29 +668,31 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         ))}
       </View>
 
-      {/* Control Buttons */}
-      <View style={styles.controlsBar}>
-        <TouchableOpacity
-          style={[styles.controlBtn, (history.length === 0 || isWon) && styles.controlBtnDisabled]}
-          onPress={handleUndo}
-          disabled={history.length === 0 || isWon}
-        >
-          <FontAwesome name="undo" size={16} color={history.length === 0 || isWon ? uiTheme.textDisabled : uiTheme.textPrimary} />
-          <Text style={[styles.controlBtnText, (history.length === 0 || isWon) && styles.controlBtnTextDisabled]}>Undo</Text>
-        </TouchableOpacity>
+      {/* Control Buttons rendered only if showControls is true */}
+      {showControls && (
+        <View style={styles.controlsBar}>
+          <TouchableOpacity
+            style={[styles.controlBtn, (history.length === 0 || isWon) && styles.controlBtnDisabled]}
+            onPress={handleUndo}
+            disabled={history.length === 0 || isWon}
+          >
+            <FontAwesome name="undo" size={16} color={history.length === 0 || isWon ? uiTheme.textDisabled : uiTheme.textPrimary} />
+            <Text style={[styles.controlBtnText, (history.length === 0 || isWon) && styles.controlBtnTextDisabled]}>Undo</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.controlBtn, isWon && styles.controlBtnDisabled]} onPress={handleRestart} disabled={isWon}>
-          <FontAwesome name="refresh" size={16} color={isWon ? uiTheme.textDisabled : uiTheme.textPrimary} />
-          <Text style={[styles.controlBtnText, isWon && styles.controlBtnTextDisabled]}>Restart</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={[styles.controlBtn, isWon && styles.controlBtnDisabled]} onPress={handleRestart} disabled={isWon}>
+            <FontAwesome name="refresh" size={16} color={isWon ? uiTheme.textDisabled : uiTheme.textPrimary} />
+            <Text style={[styles.controlBtnText, isWon && styles.controlBtnTextDisabled]}>Restart</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.controlBtn, (isWon || hintsCount <= 0) && styles.controlBtnDisabled]} onPress={handleHintPress} disabled={isWon}>
-          <FontAwesome name="lightbulb-o" size={16} color={isWon || hintsCount <= 0 ? uiTheme.textDisabled : uiTheme.warning} />
-          <Text style={[styles.controlBtnText, { color: isWon || hintsCount <= 0 ? uiTheme.textDisabled : uiTheme.warning }]}>
-            Hint ({hintsCount})
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={[styles.controlBtn, (isWon || hintsCount <= 0) && styles.controlBtnDisabled]} onPress={handleHintPress} disabled={isWon}>
+            <FontAwesome name="lightbulb-o" size={16} color={isWon || hintsCount <= 0 ? uiTheme.textDisabled : uiTheme.warning} />
+            <Text style={[styles.controlBtnText, { color: isWon || hintsCount <= 0 ? uiTheme.textDisabled : uiTheme.warning }]}>
+              Hint ({hintsCount})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Victory Modal */}
       <Modal visible={isWon} transparent animationType="fade">

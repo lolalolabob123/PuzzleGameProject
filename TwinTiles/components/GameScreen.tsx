@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from "react";
+import React, { useMemo, useCallback, useState, useRef } from "react";
 import { View, StyleSheet, Text, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -21,9 +21,22 @@ import {
 
 import { todayKey } from "../utils/daily";
 import { getEffectCount, useEffectToken } from "../utils/coins";
-import { unlockNextLevel, saveLevelStars, clearActiveSession } from "../utils/progress";
+import { unlockNextLevel, clearActiveSession } from "../utils/progress";
+import { InteractiveTutorial } from "./InteractiveTutorial";
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Standardized single storage key
+const TUTORIAL_STORAGE_KEY = "@twintiles_tutorial_seen";
 
 type GameScreenProps = NativeStackScreenProps<RootStackParamList, "Game">;
+
+export interface LayoutRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export default function GameScreen({ route, navigation }: GameScreenProps) {
   const {
@@ -39,6 +52,84 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   const [hints, setHints] = useState<number>(0);
   const [skipCount, setSkipCount] = useState<number>(0);
   const [hintTrigger, setHintTrigger] = useState<number>(0);
+  const [showTutorial, setShowTutorial] = useState<boolean>(false);
+
+  // Live board state tracking for interactive tutorial verification
+  const [currentGridState, setCurrentGridState] = useState<number[]>([]);
+  const [highlightedCellIndex, setHighlightedCellIndex] = useState<number | null>(null);
+
+  // Target measurement layouts for spotlight placement
+  const [spotlightLayouts, setSpotlightLayouts] = useState<{
+    board?: LayoutRect;
+    counters?: LayoutRect;
+    controls?: LayoutRect;
+  }>({});
+
+  const boardContainerRef = useRef<View>(null);
+  const actionBarRef = useRef<View>(null);
+
+  // Measure exact pixel bounds on screen
+  const handleMeasureElements = useCallback(() => {
+    boardContainerRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        setSpotlightLayouts((prev) => ({
+          ...prev,
+          // Target inner grid box
+          board: { x: x + 24, y: y + 42, width: width - 48, height: height - 60 },
+          // Target entire container including outer edge counters
+          counters: { x: x + 4, y: y + 8, width: width - 8, height: height - 16 },
+        }));
+      }
+    });
+
+    actionBarRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        setSpotlightLayouts((prev) => ({
+          ...prev,
+          controls: { x: x + 12, y: y + 4, width: width - 24, height: height - 8 },
+        }));
+      }
+    });
+  }, []);
+
+  // Check tutorial status whenever screen is focused or parameters change
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      const checkTutorialStatus = async () => {
+        try {
+          if (forcedReset && chapterId === 1 && levelId === 1 && !daily) {
+            if (active) setShowTutorial(true);
+            return;
+          }
+
+          const seen = await AsyncStorage.getItem(TUTORIAL_STORAGE_KEY);
+          if (!seen && chapterId === 1 && levelId === 1 && !daily) {
+            if (active) setShowTutorial(true);
+          }
+        } catch (err) {
+          console.error("Error reading tutorial state:", err);
+        }
+      };
+
+      checkTutorialStatus();
+
+      return () => {
+        active = false;
+      };
+    }, [chapterId, levelId, daily, forcedReset])
+  );
+
+  const handleCloseTutorial = async () => {
+    setShowTutorial(false);
+    setHighlightedCellIndex(null);
+    try {
+      await AsyncStorage.setItem(TUTORIAL_STORAGE_KEY, "true");
+    } catch (err) {
+      console.error("Error saving tutorial state:", err);
+    }
+  };
 
   // Sync consumable token balances whenever screen receives focus
   const loadTokens = useCallback(async () => {
@@ -142,7 +233,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           { text: "Cancel", style: "cancel" },
           {
             text: "Go to Shop",
-            onPress: () => navigation.navigate("Main", { screen: "Shop" } as never)
+            onPress: () => navigation.navigate("Main", { screen: "Shop" } as never),
           },
         ]
       );
@@ -166,7 +257,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           { text: "Cancel", style: "cancel" },
           {
             text: "Go to Shop",
-            onPress: () => navigation.navigate("Main", { screen: "Shop" } as never)
+            onPress: () => navigation.navigate("Main", { screen: "Shop" } as never),
           },
         ]
       );
@@ -225,12 +316,15 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           {daily ? "Daily Challenge" : `Chapter ${chapterId} • Level ${levelId}`}
         </Text>
 
-        {/* Empty placeholder view to keep header title centered */}
         <View style={{ width: 36 }} />
       </View>
 
       {/* Board Container */}
-      <View style={styles.boardContainer}>
+      <View
+        ref={boardContainerRef}
+        style={styles.boardContainer}
+        onLayout={handleMeasureElements}
+      >
         <PuzzleBoard
           key={boardKey}
           levelData={levelData}
@@ -241,11 +335,17 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           forcedReset={forcedReset}
           daily={daily}
           hintTrigger={hintTrigger}
+          highlightCellIndex={highlightedCellIndex}
+          onGridChange={setCurrentGridState}
         />
       </View>
 
       {/* Power-Up Action Bar */}
-      <View style={[styles.actionBar, { borderColor: uiTheme.border }]}>
+      <View
+        ref={actionBarRef}
+        style={[styles.actionBar, { borderColor: uiTheme.border }]}
+        onLayout={handleMeasureElements}
+      >
         <TouchableOpacity
           style={[
             styles.powerupButton,
@@ -274,6 +374,15 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Tutorial Overlay */}
+      <InteractiveTutorial
+        visible={showTutorial}
+        onFinish={handleCloseTutorial}
+        currentGridState={currentGridState}
+        onHighlightCellChange={setHighlightedCellIndex}
+        layouts={spotlightLayouts}
+      />
     </SafeAreaView>
   );
 }
