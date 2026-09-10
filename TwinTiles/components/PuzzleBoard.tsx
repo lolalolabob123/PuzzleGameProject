@@ -40,9 +40,10 @@ export interface PuzzleBoardProps {
   forcedReset?: boolean;
   daily?: boolean;
   hintTrigger?: number;
-  highlightCellIndex?: number | null;
+  highlightCellIndex?: number | number[] | null;
+  highlightCounters?: boolean;
   onGridChange?: Dispatch<SetStateAction<number[]>>;
-  showControls?: boolean; // Prop to toggle internal controls bar
+  showControls?: boolean;
 }
 
 function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[], voids?: number[]): number[] | null {
@@ -50,7 +51,6 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
   const isVoid = (i: number) => voids?.includes(i) ?? false;
 
   function isValid(g: number[]): boolean {
-    // Check horizontal constraints
     for (let r = 0; r < size; r++) {
       let r1 = 0, r2 = 0;
       let consecutiveVal = 0;
@@ -80,7 +80,6 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
       }
     }
 
-    // Check vertical constraints
     for (let c = 0; c < size; c++) {
       let c1 = 0, c2 = 0;
       let consecutiveVal = 0;
@@ -110,7 +109,6 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
       }
     }
 
-    // Check linked pair constraints
     if (linkedPairs && Array.isArray(linkedPairs)) {
       for (const pair of linkedPairs) {
         let a: number | undefined, b: number | undefined, type = "equal";
@@ -169,6 +167,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   daily = false,
   hintTrigger = 0,
   highlightCellIndex = null,
+  highlightCounters = false,
   onGridChange,
   showControls = true,
 }) => {
@@ -192,7 +191,6 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     new Animated.Value(0),
   ]).current;
 
-  // Sync grid changes with parent state handler when provided
   const updateGridState = useCallback((newGrid: number[]) => {
     setGrid(newGrid);
     if (onGridChange) {
@@ -213,9 +211,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       if (type === "light") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (type === "medium") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (type === "success") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // Native haptics fallback
-    }
+    } catch {}
   };
 
   const refreshHints = useCallback(async () => {
@@ -236,7 +232,6 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     const isFilled = !currentGrid.some((val, i) => val === 0 && !isVoidIndex(i));
     if (!isFilled) return false;
 
-    // Check horizontal contiguous matches
     for (let r = 0; r < size; r++) {
       let consecutiveVal = 0;
       let consecutiveCount = 0;
@@ -254,7 +249,6 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       }
     }
 
-    // Check vertical contiguous matches
     for (let c = 0; c < size; c++) {
       let consecutiveVal = 0;
       let consecutiveCount = 0;
@@ -272,7 +266,6 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       }
     }
 
-    // Check linked pairs
     if (levelData.linkedPairs && Array.isArray(levelData.linkedPairs)) {
       for (const pair of levelData.linkedPairs) {
         let idx1: number | undefined, idx2: number | undefined, expectedType = "equal";
@@ -297,6 +290,12 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
 
     return true;
   }, [isVoidIndex, size, levelData.linkedPairs]);
+
+  const isHighlightedCell = useCallback((idx: number) => {
+    if (highlightCellIndex === null || highlightCellIndex === undefined) return false;
+    if (Array.isArray(highlightCellIndex)) return highlightCellIndex.includes(idx);
+    return highlightCellIndex === idx;
+  }, [highlightCellIndex]);
 
   const initialEmptyCount = useMemo(() => {
     return levelData.grid.filter((val, idx) => val === 0 && !isVoidIndex(idx)).length;
@@ -585,7 +584,14 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         {/* Top Column Counters */}
         <View style={styles.columnCountersRow}>
           {colCounts.map((col, cIdx) => (
-            <View key={cIdx} style={[styles.colCounterBox, { width: tileSize, marginHorizontal: TILE_MARGIN }]}>
+            <View
+              key={cIdx}
+              style={[
+                styles.colCounterBox,
+                { width: tileSize, marginHorizontal: TILE_MARGIN },
+                highlightCounters && styles.counterHighlighted,
+              ]}
+            >
               <Text style={styles.counterText1}>{col.ones}/{targetPerType}</Text>
               <Text style={styles.counterText2}>{col.twos}/{targetPerType}</Text>
             </View>
@@ -604,6 +610,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
 
               const rightLink = colIndex < size - 1 ? getLinkInfo(idx, idx + 1) : null;
               const bottomLink = rowIndex < size - 1 ? getLinkInfo(idx, idx + size) : null;
+              const isCellHighlighted = isHighlightedCell(idx);
 
               return (
                 <View key={idx} style={{ position: "relative" }}>
@@ -625,7 +632,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
                         isFixed && styles.tileFixed,
                         hintedIndex === idx && styles.tileHinted,
                         errorIndex === idx && styles.tileError,
-                        highlightCellIndex === idx && styles.tileHinted,
+                        isCellHighlighted && styles.tileRuleHighlight,
                       ]}
                     >
                       {val !== 0 ? (
@@ -642,14 +649,12 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
                     </TouchableOpacity>
                   )}
 
-                  {/* Horizontal Link Badge */}
                   {rightLink?.linked && (
                     <View style={styles.rightLinkConnector}>
                       <Text style={styles.linkSymbol}>{rightLink.type === "opposite" ? "≠" : "="}</Text>
                     </View>
                   )}
 
-                  {/* Vertical Link Badge */}
                   {bottomLink?.linked && (
                     <View style={styles.bottomLinkConnector}>
                       <Text style={styles.linkSymbol}>{bottomLink.type === "opposite" ? "≠" : "="}</Text>
@@ -660,7 +665,13 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
             })}
 
             {/* Row Counter Box */}
-            <View style={[styles.rowCounterBox, { height: tileSize, width: counterSize, marginVertical: TILE_MARGIN }]}>
+            <View
+              style={[
+                styles.rowCounterBox,
+                { height: tileSize, width: counterSize, marginVertical: TILE_MARGIN },
+                highlightCounters && styles.counterHighlighted,
+              ]}
+            >
               <Text style={styles.counterText1}>{rowCounts[rowIndex].ones}/{targetPerType}</Text>
               <Text style={styles.counterText2}>{rowCounts[rowIndex].twos}/{targetPerType}</Text>
             </View>
@@ -668,7 +679,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         ))}
       </View>
 
-      {/* Control Buttons rendered only if showControls is true */}
+      {/* Control Buttons */}
       {showControls && (
         <View style={styles.controlsBar}>
           <TouchableOpacity
@@ -751,11 +762,18 @@ const makeStyles = (uiTheme: UITheme) =>
     colCounterBox: {
       alignItems: "center",
       justifyContent: "center",
+      borderRadius: radii.sm,
     },
     rowCounterBox: {
       alignItems: "center",
       justifyContent: "center",
       marginLeft: spacing.xs,
+      borderRadius: radii.sm,
+    },
+    counterHighlighted: {
+      borderWidth: 2,
+      borderColor: "#FFD700",
+      backgroundColor: "rgba(255, 215, 0, 0.15)",
     },
     counterText1: {
       fontSize: 9,
@@ -791,6 +809,15 @@ const makeStyles = (uiTheme: UITheme) =>
     tileHinted: {
       borderWidth: 3,
       borderColor: uiTheme.warning,
+    },
+    tileRuleHighlight: {
+      borderWidth: 3,
+      borderColor: "#FFD700",
+      shadowColor: "#FFD700",
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 6,
+      elevation: 6,
     },
     tileError: {
       borderWidth: 3,

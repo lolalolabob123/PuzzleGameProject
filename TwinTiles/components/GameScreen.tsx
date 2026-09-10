@@ -56,7 +56,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
 
   // Live board state tracking for interactive tutorial verification
   const [currentGridState, setCurrentGridState] = useState<number[]>([]);
-  const [highlightedCellIndex, setHighlightedCellIndex] = useState<number | null>(null);
+  const [highlightedCellIndex, setHighlightedCellIndex] = useState<number | number[] | null>(null);
 
   // Target measurement layouts for spotlight placement
   const [spotlightLayouts, setSpotlightLayouts] = useState<{
@@ -65,28 +65,31 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     controls?: LayoutRect;
   }>({});
 
-  const boardContainerRef = useRef<View>(null);
+  const boardWrapperRef = useRef<View>(null);
   const actionBarRef = useRef<View>(null);
 
-  // Measure exact pixel bounds on screen
-  const handleMeasureElements = useCallback(() => {
-    boardContainerRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
-        setSpotlightLayouts((prev) => ({
-          ...prev,
-          // Target inner grid box
-          board: { x: x + 24, y: y + 42, width: width - 48, height: height - 60 },
-          // Target entire container including outer edge counters
-          counters: { x: x + 4, y: y + 8, width: width - 8, height: height - 16 },
-        }));
-      }
+  const handleBoardLayout = useCallback(() => {
+    requestAnimationFrame(() => {
+      boardWrapperRef.current?.measureInWindow((x, y, width, height) => {
+        // Ensure we received valid dimensions that don't match the whole screen
+        if (width > 0 && height > 0) {
+          setSpotlightLayouts((prev) => ({
+            ...prev,
+            counters: { x, y, width, height },
+            board: { x, y, width, height },
+          }));
+        }
+      });
     });
+  }, []);
 
+  // Measure power-up action bar
+  const handleActionBarLayout = useCallback(() => {
     actionBarRef.current?.measureInWindow((x, y, width, height) => {
       if (width > 0 && height > 0) {
         setSpotlightLayouts((prev) => ({
           ...prev,
-          controls: { x: x + 12, y: y + 4, width: width - 24, height: height - 8 },
+          controls: { x, y, width, height },
         }));
       }
     });
@@ -320,31 +323,34 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
       </View>
 
       {/* Board Container */}
-      <View
-        ref={boardContainerRef}
-        style={styles.boardContainer}
-        onLayout={handleMeasureElements}
-      >
-        <PuzzleBoard
-          key={boardKey}
-          levelData={levelData}
-          chapterId={chapterId}
-          level={levelId}
-          size={levelData.size}
-          onNextLevel={handleNextLevel}
-          forcedReset={forcedReset}
-          daily={daily}
-          hintTrigger={hintTrigger}
-          highlightCellIndex={highlightedCellIndex}
-          onGridChange={setCurrentGridState}
-        />
+      <View style={styles.boardContainer}>
+        <View
+          ref={boardWrapperRef}
+          onLayout={handleBoardLayout}
+          style={styles.boardWrapper}
+          collapsable={false}
+        >
+          <PuzzleBoard
+            key={boardKey}
+            levelData={levelData}
+            chapterId={chapterId}
+            level={levelId}
+            size={levelData.size}
+            onNextLevel={handleNextLevel}
+            forcedReset={forcedReset}
+            daily={daily}
+            hintTrigger={hintTrigger}
+            highlightCellIndex={highlightedCellIndex}
+            onGridChange={setCurrentGridState}
+          />
+        </View>
       </View>
 
       {/* Power-Up Action Bar */}
       <View
         ref={actionBarRef}
         style={[styles.actionBar, { borderColor: uiTheme.border }]}
-        onLayout={handleMeasureElements}
+        onLayout={handleActionBarLayout}
       >
         <TouchableOpacity
           style={[
@@ -439,6 +445,12 @@ const styles = StyleSheet.create({
   },
   boardContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  boardWrapper: {
+    alignSelf: "center",
+    flexGrow: 0, // Prevents expanding vertically in flex parent
   },
   actionBar: {
     flexDirection: "row",

@@ -20,53 +20,75 @@ export interface LayoutRect {
   height: number;
 }
 
-export interface StepConfig {
-  id: number;
+export interface TutorialStep {
+  step: number;
+  totalSteps: number;
   title: string;
+  description: string;
   instruction: string;
   type: "info" | "interactive";
+  highlightArea: "none" | "board" | "counters" | "controls";
+  highlightCells: number[] | null;
+  highlightCounters: boolean;
   targetCellIndex?: number;
   expectedValue?: number;
-  highlightArea?: "board" | "counters" | "controls" | "none";
 }
 
-const TUTORIAL_STEPS: StepConfig[] = [
+const TUTORIAL_STEPS: TutorialStep[] = [
   {
-    id: 0,
+    step: 1,
+    totalSteps: 5,
     title: "Welcome to TwinTiles!",
-    instruction: "Let's learn the basic rules of the game in 4 quick steps.",
+    description: "Let's learn the basic rules of the game in quick steps.",
+    instruction: "Tap Next Step to begin the tutorial.",
     type: "info",
     highlightArea: "none",
+    highlightCells: null,
+    highlightCounters: false,
   },
   {
-    id: 1,
+    step: 2,
+    totalSteps: 5,
     title: "Rule #1: The 2-Tile Limit",
-    instruction: "You can NEVER place more than 2 tiles of the same color directly next to each other in a row or column.",
+    description: "You can NEVER place more than 2 tiles of the same color directly next to each other in a row or column.",
+    instruction: "Notice the highlighted adjacent tiles on the board below.",
     type: "info",
-    highlightArea: "board",
+    highlightArea: "none",
+    highlightCells: [8, 9, 10],
+    highlightCounters: false,
   },
   {
-    id: 2,
+    step: 3,
+    totalSteps: 5,
     title: "Rule #2: Equal Balance",
-    instruction: "Look at the edge counters. Each row and column must contain an equal number of both tile colors.",
+    description: "Look at the edge counters. Each row and column must contain an equal number of both tile colors.",
+    instruction: "Check the row and column ratio indicators along the edges.",
     type: "info",
     highlightArea: "counters",
+    highlightCells: null,
+    highlightCounters: true,
   },
   {
-    id: 3,
-    title: "Try It Yourself!",
-    instruction: "Tap the highlighted cell on the board to change its color.",
-    type: "interactive",
-    targetCellIndex: 0,
-    expectedValue: 1,
-    highlightArea: "board",
-  },
-  {
-    id: 4,
-    title: "You're Ready!",
-    instruction: "Remember: check edge counters and avoid 3 of the same color in a row. Use Hint or Skip whenever you get stuck!",
+    step: 4,
+    totalSteps: 5,
+    title: "Fixed Starting Tiles",
+    description: "Tiles pre-filled with numbers at the start of a puzzle are fixed in place and cannot be changed.",
+    instruction: "Use these starting tiles as anchors to deduce surrounding colors.",
     type: "info",
-    highlightArea: "controls",
+    highlightArea: "none",
+    highlightCells: [0, 2],
+    highlightCounters: false,
+  },
+  {
+    step: 5,
+    totalSteps: 5,
+    title: "You're Ready!",
+    description: "Remember: check edge counters and avoid 3 of the same color in a row. Use Hint or Skip whenever you get stuck!",
+    instruction: "You're all set to play!",
+    type: "info",
+    highlightArea: "none",
+    highlightCells: null,
+    highlightCounters: false,
   },
 ];
 
@@ -75,7 +97,8 @@ interface Props {
   onFinish: () => void | Promise<void>;
   onTileTapRequired?: (cellIndex: number) => void;
   currentGridState?: number[];
-  onHighlightCellChange?: (cellIndex: number | null) => void;
+  onHighlightCellChange?: (cellIndex: number | number[] | null) => void;
+  onHighlightCountersChange?: (highlight: boolean) => void;
   layouts?: {
     board?: LayoutRect;
     counters?: LayoutRect;
@@ -88,6 +111,7 @@ export const InteractiveTutorial: React.FC<Props> = ({
   onFinish,
   currentGridState = [],
   onHighlightCellChange,
+  onHighlightCountersChange,
   layouts,
 }) => {
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
@@ -97,22 +121,30 @@ export const InteractiveTutorial: React.FC<Props> = ({
 
   const step = TUTORIAL_STEPS[currentStepIdx];
 
-  // Notify parent of highlighted tile index
   useEffect(() => {
-    if (visible && step.type === "interactive" && step.targetCellIndex !== undefined) {
+    if (!visible) {
+      onHighlightCellChange?.(null);
+      onHighlightCountersChange?.(false);
+      return;
+    }
+
+    if (step.highlightCells) {
+      onHighlightCellChange?.(step.highlightCells);
+    } else if (step.type === "interactive" && step.targetCellIndex !== undefined) {
       onHighlightCellChange?.(step.targetCellIndex);
     } else {
       onHighlightCellChange?.(null);
     }
-  }, [currentStepIdx, step, visible, onHighlightCellChange]);
 
-  // Pulsing spotlight animation effect
+    onHighlightCountersChange?.(step.highlightCounters ?? false);
+  }, [currentStepIdx, step, visible, onHighlightCellChange, onHighlightCountersChange]);
+
   useEffect(() => {
     if (step.type === "interactive" || step.highlightArea !== "none") {
       const animation = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.05,
+            toValue: 1.03,
             duration: 700,
             useNativeDriver: true,
           }),
@@ -128,19 +160,6 @@ export const InteractiveTutorial: React.FC<Props> = ({
     }
   }, [step, pulseAnim]);
 
-  // Auto-advance interactive step once tile state matches expectedValue
-  useEffect(() => {
-    if (
-      step.type === "interactive" &&
-      step.targetCellIndex !== undefined &&
-      step.expectedValue !== undefined
-    ) {
-      if (currentGridState[step.targetCellIndex] === step.expectedValue) {
-        handleNext();
-      }
-    }
-  }, [currentGridState, step]);
-
   if (!visible) return null;
 
   const handleNext = () => {
@@ -149,6 +168,7 @@ export const InteractiveTutorial: React.FC<Props> = ({
     } else {
       setCurrentStepIdx(0);
       onHighlightCellChange?.(null);
+      onHighlightCountersChange?.(false);
       onFinish();
     }
   };
@@ -156,76 +176,30 @@ export const InteractiveTutorial: React.FC<Props> = ({
   const handleSkip = () => {
     setCurrentStepIdx(0);
     onHighlightCellChange?.(null);
+    onHighlightCountersChange?.(false);
     onFinish();
   };
 
-  // Render distinct spotlight borders depending on highlightArea step and measured layouts
   const renderSpotlight = () => {
-    if (step.highlightArea === "board") {
-      const boardLayout = layouts?.board;
-      const dynamicStyle = boardLayout
-        ? {
-            top: boardLayout.y,
-            left: boardLayout.x,
-            width: boardLayout.width,
-            height: boardLayout.height,
-          }
-        : styles.spotlightBoardFallback;
+    if (step.highlightArea === "counters" || step.highlightArea === "board") {
+      const layout = step.highlightArea === "counters" ? layouts?.counters : layouts?.board;
 
-      return (
-        <Animated.View
-          style={[
-            styles.spotlightBase,
-            styles.spotlightBoardColor,
-            dynamicStyle,
-            { transform: [{ scale: pulseAnim }] },
-          ]}
-          pointerEvents="none"
-        />
-      );
-    }
-
-    if (step.highlightArea === "counters") {
-      const countersLayout = layouts?.counters;
-      const dynamicStyle = countersLayout
-        ? {
-            top: countersLayout.y,
-            left: countersLayout.x,
-            width: countersLayout.width,
-            height: countersLayout.height,
-          }
-        : styles.spotlightCountersFallback;
+      if (!layout || layout.width === 0 || layout.height === 0) {
+        return null;
+      }
 
       return (
         <Animated.View
           style={[
             styles.spotlightBase,
             styles.spotlightCountersColor,
-            dynamicStyle,
-            { transform: [{ scale: pulseAnim }] },
-          ]}
-          pointerEvents="none"
-        />
-      );
-    }
-
-    if (step.highlightArea === "controls") {
-      const controlsLayout = layouts?.controls;
-      const dynamicStyle = controlsLayout
-        ? {
-            top: controlsLayout.y,
-            left: controlsLayout.x,
-            width: controlsLayout.width,
-            height: controlsLayout.height,
-          }
-        : styles.spotlightControlsFallback;
-
-      return (
-        <Animated.View
-          style={[
-            styles.spotlightBase,
-            styles.spotlightControlsColor,
-            dynamicStyle,
+            {
+              top: layout.y - 6,         // Add slight padding around the card
+              left: layout.x - 6,
+              width: layout.width + 12,
+              height: layout.height + 12,
+              borderRadius: radii.xl + 4,
+            },
             { transform: [{ scale: pulseAnim }] },
           ]}
           pointerEvents="none"
@@ -238,23 +212,17 @@ export const InteractiveTutorial: React.FC<Props> = ({
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      {/* 
-        Pass pointerEvents="none" when step is interactive so user taps
-        pass through directly to the PuzzleBoard underneath!
-      */}
       <View
         style={styles.backdrop}
         pointerEvents={step.type === "interactive" ? "none" : "auto"}
       />
 
-      {/* Render active area highlight ring */}
       {renderSpotlight()}
 
-      {/* Floating Guidance Card */}
       <View
         style={[
           styles.cardContainer,
-          step.highlightArea === "board" ? { bottom: spacing.xl } : { top: SCREEN_HEIGHT * 0.1 },
+          { bottom: spacing.xl }
         ]}
         pointerEvents="auto"
       >
@@ -269,6 +237,7 @@ export const InteractiveTutorial: React.FC<Props> = ({
           </View>
 
           <Text style={styles.title}>{step.title}</Text>
+          <Text style={styles.descriptionText}>{step.description}</Text>
           <Text style={styles.instruction}>{step.instruction}</Text>
 
           {step.type === "info" && (
@@ -278,13 +247,6 @@ export const InteractiveTutorial: React.FC<Props> = ({
               </Text>
               <FontAwesome name="chevron-right" size={12} color={uiTheme.onPrimary} />
             </TouchableOpacity>
-          )}
-
-          {step.type === "interactive" && (
-            <View style={styles.interactiveBadge}>
-              <FontAwesome name="hand-pointer-o" size={14} color={uiTheme.warning} />
-              <Text style={styles.interactiveText}>Tap highlighted tile on board below</Text>
-            </View>
           )}
         </View>
       </View>
@@ -338,12 +300,19 @@ const makeStyles = (uiTheme: UITheme) =>
       color: uiTheme.textPrimary,
       marginBottom: spacing.xs,
     },
-    instruction: {
+    descriptionText: {
       ...typography.body,
       fontSize: 13,
+      color: uiTheme.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    instruction: {
+      ...typography.body,
+      fontSize: 12,
       color: uiTheme.textMuted,
       lineHeight: 18,
       marginBottom: spacing.md,
+      fontStyle: "italic",
     },
     nextButton: {
       flexDirection: "row",
@@ -360,59 +329,14 @@ const makeStyles = (uiTheme: UITheme) =>
       color: uiTheme.onPrimary,
       fontSize: 14,
     },
-    interactiveBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: spacing.xs,
-      paddingVertical: spacing.sm,
-      backgroundColor: uiTheme.surfaceSunken,
-      borderRadius: radii.md,
-    },
-    interactiveText: {
-      ...typography.caption,
-      color: uiTheme.warning,
-      fontWeight: "700",
-    },
-
-    // --- Dynamic & Fallback Spotlight Styles ---
     spotlightBase: {
       position: "absolute",
-      borderRadius: radii.lg,
       borderWidth: 3,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.9,
-      shadowRadius: 10,
-    },
-    spotlightBoardColor: {
       borderColor: "#FFD700",
-      shadowColor: "#FFD700",
+      zIndex: 1000,
     },
     spotlightCountersColor: {
-      borderColor: "#3B82F6",
-      shadowColor: "#3B82F6",
-    },
-    spotlightControlsColor: {
-      borderColor: "#10B981",
-      shadowColor: "#10B981",
-    },
-    spotlightBoardFallback: {
-      top: SCREEN_HEIGHT * 0.22,
-      left: 16,
-      width: SCREEN_WIDTH - 32,
-      height: SCREEN_WIDTH - 32,
-    },
-    spotlightCountersFallback: {
-      top: SCREEN_HEIGHT * 0.2,
-      left: 10,
-      width: SCREEN_WIDTH - 20,
-      height: SCREEN_WIDTH,
-    },
-    spotlightControlsFallback: {
-      bottom: 12,
-      left: 16,
-      width: SCREEN_WIDTH - 32,
-      height: 64,
-      borderRadius: radii.pill,
+      borderColor: "#FFD700",
+      shadowColor: "#FFD700",
     },
   });
