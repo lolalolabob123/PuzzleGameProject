@@ -6,10 +6,13 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated,
+  Platform,
+  StatusBar,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
+import Svg, { Defs, Mask, Rect } from "react-native-svg";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -109,6 +112,7 @@ interface Props {
 export const InteractiveTutorial: React.FC<Props> = ({
   visible,
   onFinish,
+  onTileTapRequired,
   currentGridState = [],
   onHighlightCellChange,
   onHighlightCountersChange,
@@ -122,22 +126,20 @@ export const InteractiveTutorial: React.FC<Props> = ({
   const step = TUTORIAL_STEPS[currentStepIdx];
 
   useEffect(() => {
-    if (!visible) {
-      onHighlightCellChange?.(null);
-      onHighlightCountersChange?.(false);
-      return;
-    }
+    if (!visible || step.type !== "interactive") return;
+    if (step.targetCellIndex === undefined) return;
 
-    if (step.highlightCells) {
-      onHighlightCellChange?.(step.highlightCells);
-    } else if (step.type === "interactive" && step.targetCellIndex !== undefined) {
-      onHighlightCellChange?.(step.targetCellIndex);
-    } else {
-      onHighlightCellChange?.(null);
-    }
+    const currentValue = currentGridState[step.targetCellIndex];
 
-    onHighlightCountersChange?.(step.highlightCounters ?? false);
-  }, [currentStepIdx, step, visible, onHighlightCellChange, onHighlightCountersChange]);
+    const isFulfilled =
+      step.expectedValue !== undefined
+        ? currentValue === step.expectedValue
+        : currentValue !== 0 && currentValue !== undefined;
+
+    if (isFulfilled) {
+      handleNext();
+    }
+  }, [currentGridState, step, visible])
 
   useEffect(() => {
     if (step.type === "interactive" || step.highlightArea !== "none") {
@@ -180,44 +182,93 @@ export const InteractiveTutorial: React.FC<Props> = ({
     onFinish();
   };
 
-  const renderSpotlight = () => {
-    if (step.highlightArea === "counters" || step.highlightArea === "board") {
-      const layout = step.highlightArea === "counters" ? layouts?.counters : layouts?.board;
+  const normalizeY = (y: number): number => {
+    if (Platform.OS === "android") {
+      const statusBarHeight = StatusBar.currentHeight || 0;
+      return y - statusBarHeight;
+    }
+    return y;
+  };
 
-      if (!layout || layout.width === 0 || layout.height === 0) {
-        return null;
-      }
+  const renderBackdropWithCutout = () => {
+    const activeLayout =
+      step.highlightArea === "counters"
+        ? layouts?.counters
+        : step.highlightArea === "board"
+        ? layouts?.board
+        : null;
 
+    const hasSpotlight =
+      activeLayout && activeLayout.width > 0 && activeLayout.height > 0;
+
+    if (!hasSpotlight) {
       return (
+        <View
+          style={styles.backdrop}
+          pointerEvents={step.type === "interactive" ? "none" : "auto"}
+        />
+      );
+    }
+
+    const rawY = normalizeY(activeLayout.y);
+    const spotlightX = activeLayout.x - 6;
+    const spotlightY = rawY - 6;
+    const spotlightW = activeLayout.width + 12;
+    const spotlightH = activeLayout.height + 12;
+    const borderRadius = radii.xl + 4;
+
+    return (
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <Svg height={SCREEN_HEIGHT} width={SCREEN_WIDTH}>
+          <Defs>
+            <Mask id="mask" x="0" y="0" height={SCREEN_HEIGHT} width={SCREEN_WIDTH}>
+              {/* White background: dim background */}
+              <Rect x="0" y="0" height={SCREEN_HEIGHT} width={SCREEN_WIDTH} fill="white" />
+              {/* Black cutout: clear cutout hole */}
+              <Rect
+                x={spotlightX}
+                y={spotlightY}
+                width={spotlightW}
+                height={spotlightH}
+                rx={borderRadius}
+                ry={borderRadius}
+                fill="black"
+              />
+            </Mask>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            height={SCREEN_HEIGHT}
+            width={SCREEN_WIDTH}
+            fill="rgba(0,0,0,0.55)"
+            mask="url(#mask)"
+          />
+        </Svg>
+
+        {/* Pulsing golden frame ring */}
         <Animated.View
           style={[
             styles.spotlightBase,
             styles.spotlightCountersColor,
             {
-              top: layout.y - 6,         // Add slight padding around the card
-              left: layout.x - 6,
-              width: layout.width + 12,
-              height: layout.height + 12,
-              borderRadius: radii.xl + 4,
+              top: spotlightY,
+              left: spotlightX,
+              width: spotlightW,
+              height: spotlightH,
+              borderRadius: borderRadius,
             },
             { transform: [{ scale: pulseAnim }] },
           ]}
-          pointerEvents="none"
         />
-      );
-    }
-
-    return null;
+      </View>
+    );
   };
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <View
-        style={styles.backdrop}
-        pointerEvents={step.type === "interactive" ? "none" : "auto"}
-      />
-
-      {renderSpotlight()}
+      {/* Handled dynamically inside renderBackdropWithCutout */}
+      {renderBackdropWithCutout()}
 
       <View
         style={[

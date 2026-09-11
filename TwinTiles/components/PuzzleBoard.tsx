@@ -43,6 +43,7 @@ export interface PuzzleBoardProps {
   highlightCellIndex?: number | number[] | null;
   highlightCounters?: boolean;
   onGridChange?: Dispatch<SetStateAction<number[]>>;
+  onCountersLayout?: (rect: { x: number; y: number; width: number; height: number }) => void;
   showControls?: boolean;
 }
 
@@ -169,6 +170,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   highlightCellIndex = null,
   highlightCounters = false,
   onGridChange,
+  onCountersLayout,
   showControls = true,
 }) => {
   const { ui: uiTheme } = useTheme();
@@ -190,6 +192,19 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
+
+  const boardCardRef = useRef<View>(null);
+
+  const handleLayout = () => {
+    requestAnimationFrame(() => {
+      boardCardRef.current?.measureInWindow((x, y, width, height) => {
+        // Ensure values are within normal board bounds before dispatching layout
+        if (width > 0 && height > 0 && width < SCREEN_WIDTH) {
+          onCountersLayout?.({ x, y, width, height });
+        }
+      });
+    });
+  };
 
   const updateGridState = useCallback((newGrid: number[]) => {
     setGrid(newGrid);
@@ -580,7 +595,12 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         <Text style={styles.moveText}>MOVES: {moves}</Text>
       </View>
 
-      <View style={styles.boardCard}>
+      <View 
+        ref={boardCardRef} 
+        onLayout={handleLayout} 
+        collapsable={false} 
+        style={styles.boardCard}
+      >
         {/* Top Column Counters */}
         <View style={styles.columnCountersRow}>
           {colCounts.map((col, cIdx) => (

@@ -226,6 +226,10 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     }
   }, [daily, chapterId, levelId, navigation, themeIndex]);
 
+  const handleTileTapRequired = useCallback((taregtCellIndex: number) => {
+    setHighlightedCellIndex(taregtCellIndex);
+  }, []);
+
   // --- POWER-UP: HINT LOGIC ---
   const handleUseHint = async () => {
     if (hints <= 0) {
@@ -385,6 +389,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
       <InteractiveTutorial
         visible={showTutorial}
         onFinish={handleCloseTutorial}
+        onTileTapRequired={handleTileTapRequired}
         currentGridState={currentGridState}
         onHighlightCellChange={setHighlightedCellIndex}
         layouts={spotlightLayouts}
