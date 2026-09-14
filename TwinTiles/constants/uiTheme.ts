@@ -361,7 +361,8 @@ export const typography = {
   body: { fontSize: 16, fontWeight: '500' as const },
   caption: { fontSize: 13, fontWeight: '600' as const },
   micro: { fontSize: 10, fontWeight: '700' as const, letterSpacing: 0.5 },
-};
+  button: {fontSize: 16, fontWeight: "700"},
+} as const;
 
 export const shadows = {
   sm: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },

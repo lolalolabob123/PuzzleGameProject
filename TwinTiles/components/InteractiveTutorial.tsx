@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,11 +10,11 @@ import {
   StatusBar,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
+import Svg, { Defs, Mask, Rect } from "react-native-svg";
 import { useTheme } from "../context/ThemeContext";
 import { spacing, radii, typography, shadows, UITheme } from "../constants/uiTheme";
-import Svg, { Defs, Mask, Rect } from "react-native-svg";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("screen");
 
 export interface LayoutRect {
   x: number;
@@ -56,7 +56,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     description: "You can NEVER place more than 2 tiles of the same color directly next to each other in a row or column.",
     instruction: "Notice the highlighted adjacent tiles on the board below.",
     type: "info",
-    highlightArea: "none",
+    highlightArea: "board",
     highlightCells: [8, 9, 10],
     highlightCounters: false,
   },
@@ -75,10 +75,10 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     step: 4,
     totalSteps: 5,
     title: "Fixed Starting Tiles",
-    description: "Tiles pre-filled with numbers at the start of a puzzle are fixed in place and cannot be changed.",
+    description: "Tiles pre-filled at the start of a puzzle are fixed in place and cannot be changed.",
     instruction: "Use these starting tiles as anchors to deduce surrounding colors.",
     type: "info",
-    highlightArea: "none",
+    highlightArea: "board",
     highlightCells: [0, 2],
     highlightCounters: false,
   },
@@ -119,29 +119,49 @@ export const InteractiveTutorial: React.FC<Props> = ({
   layouts,
 }) => {
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const { ui: uiTheme } = useTheme();
-  const styles = React.useMemo(() => makeStyles(uiTheme), [uiTheme]);
+  const styles = useMemo(() => makeStyles(uiTheme), [uiTheme]);
 
   const step = TUTORIAL_STEPS[currentStepIdx];
+
+  useEffect(() => {
+    if (!visible) return;
+    onHighlightCellChange?.(step.highlightCells);
+    onHighlightCountersChange?.(step.highlightCounters);
+
+    if (step.targetCellIndex !== undefined) {
+      onTileTapRequired?.(step.targetCellIndex);
+    }
+  }, [
+    currentStepIdx,
+    visible,
+    step,
+    onHighlightCellChange,
+    onHighlightCountersChange,
+    onTileTapRequired,
+  ]);
 
   useEffect(() => {
     if (!visible || step.type !== "interactive") return;
     if (step.targetCellIndex === undefined) return;
 
     const currentValue = currentGridState[step.targetCellIndex];
-
     const isFulfilled =
       step.expectedValue !== undefined
         ? currentValue === step.expectedValue
         : currentValue !== 0 && currentValue !== undefined;
 
     if (isFulfilled) {
-      handleNext();
+      if (currentStepIdx < TUTORIAL_STEPS.length - 1) {
+        setCurrentStepIdx((prev) => prev + 1);
+      }
     }
-  }, [currentGridState, step, visible])
+  }, [currentGridState, step, visible, currentStepIdx]);
 
   useEffect(() => {
+    if (!visible) return;
+
     if (step.type === "interactive" || step.highlightArea !== "none") {
       const animation = Animated.loop(
         Animated.sequence([
@@ -160,7 +180,7 @@ export const InteractiveTutorial: React.FC<Props> = ({
       animation.start();
       return () => animation.stop();
     }
-  }, [step, pulseAnim]);
+  }, [step, pulseAnim, visible]);
 
   if (!visible) return null;
 
@@ -183,25 +203,24 @@ export const InteractiveTutorial: React.FC<Props> = ({
   };
 
   const normalizeY = (y: number): number => {
-    if (Platform.OS === "android") {
-      const statusBarHeight = StatusBar.currentHeight || 0;
-      return y - statusBarHeight;
-    }
     return y;
   };
 
   const renderBackdropWithCutout = () => {
-    const activeLayout =
-      step.highlightArea === "counters"
-        ? layouts?.counters
-        : step.highlightArea === "board"
-        ? layouts?.board
-        : null;
+    let activeLayout: LayoutRect | undefined;
 
-    const hasSpotlight =
-      activeLayout && activeLayout.width > 0 && activeLayout.height > 0;
+    if (step.highlightArea === "counters") {
+      activeLayout =
+        layouts?.counters && layouts.counters.height > 50
+          ? layouts.counters
+          : layouts?.board;
+    } else if (step.highlightArea === "board") {
+      activeLayout = layouts?.board;
+    } else if (step.highlightArea === "controls") {
+      activeLayout = layouts?.controls;
+    }
 
-    if (!hasSpotlight) {
+    if (!activeLayout || activeLayout.width <= 0 || activeLayout.height <= 0) {
       return (
         <View
           style={styles.backdrop}
@@ -222,9 +241,7 @@ export const InteractiveTutorial: React.FC<Props> = ({
         <Svg height={SCREEN_HEIGHT} width={SCREEN_WIDTH}>
           <Defs>
             <Mask id="mask" x="0" y="0" height={SCREEN_HEIGHT} width={SCREEN_WIDTH}>
-              {/* White background: dim background */}
               <Rect x="0" y="0" height={SCREEN_HEIGHT} width={SCREEN_WIDTH} fill="white" />
-              {/* Black cutout: clear cutout hole */}
               <Rect
                 x={spotlightX}
                 y={spotlightY}
@@ -246,7 +263,6 @@ export const InteractiveTutorial: React.FC<Props> = ({
           />
         </Svg>
 
-        {/* Pulsing golden frame ring */}
         <Animated.View
           style={[
             styles.spotlightBase,
@@ -267,14 +283,10 @@ export const InteractiveTutorial: React.FC<Props> = ({
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      {/* Handled dynamically inside renderBackdropWithCutout */}
       {renderBackdropWithCutout()}
 
       <View
-        style={[
-          styles.cardContainer,
-          { bottom: spacing.xl }
-        ]}
+        style={[styles.cardContainer, { bottom: spacing.xl }]}
         pointerEvents="auto"
       >
         <View style={styles.card}>
@@ -282,7 +294,10 @@ export const InteractiveTutorial: React.FC<Props> = ({
             <Text style={styles.stepCounter}>
               STEP {currentStepIdx + 1} OF {TUTORIAL_STEPS.length}
             </Text>
-            <TouchableOpacity onPress={handleSkip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={handleSkip}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.skipText}>Skip</Text>
             </TouchableOpacity>
           </View>
@@ -292,9 +307,15 @@ export const InteractiveTutorial: React.FC<Props> = ({
           <Text style={styles.instruction}>{step.instruction}</Text>
 
           {step.type === "info" && (
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={handleNext}
+              activeOpacity={0.8}
+            >
               <Text style={styles.nextButtonText}>
-                {currentStepIdx === TUTORIAL_STEPS.length - 1 ? "Start Playing" : "Next Step"}
+                {currentStepIdx === TUTORIAL_STEPS.length - 1
+                  ? "Start Playing"
+                  : "Next Step"}
               </Text>
               <FontAwesome name="chevron-right" size={12} color={uiTheme.onPrimary} />
             </TouchableOpacity>
@@ -390,4 +411,4 @@ const makeStyles = (uiTheme: UITheme) =>
       borderColor: "#FFD700",
       shadowColor: "#FFD700",
     },
-  });
+  });``

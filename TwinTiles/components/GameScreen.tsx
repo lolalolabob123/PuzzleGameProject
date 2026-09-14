@@ -26,7 +26,6 @@ import { InteractiveTutorial } from "./InteractiveTutorial";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Standardized single storage key
 const TUTORIAL_STORAGE_KEY = "@twintiles_tutorial_seen";
 
 type GameScreenProps = NativeStackScreenProps<RootStackParamList, "Game">;
@@ -54,9 +53,10 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   const [hintTrigger, setHintTrigger] = useState<number>(0);
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
 
-  // Live board state tracking for interactive tutorial verification
+  // Live board state tracking & active tutorial highlights
   const [currentGridState, setCurrentGridState] = useState<number[]>([]);
   const [highlightedCellIndex, setHighlightedCellIndex] = useState<number | number[] | null>(null);
+  const [highlightCounters, setHighlightCounters] = useState<boolean>(false);
 
   // Target measurement layouts for spotlight placement
   const [spotlightLayouts, setSpotlightLayouts] = useState<{
@@ -68,14 +68,17 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   const boardWrapperRef = useRef<View>(null);
   const actionBarRef = useRef<View>(null);
 
-  const handleBoardLayout = useCallback(() => {
+  const handleBoardLayout = useCallback((rect?: LayoutRect) => {
+    if (rect && rect.width > 0 && rect.height > 0) {
+      setSpotlightLayouts((prev) => ({ ...prev, board: rect }));
+      return;
+    }
+    // Use a slight frame delay to ensure accurate window coordinates after layout renders
     requestAnimationFrame(() => {
       boardWrapperRef.current?.measureInWindow((x, y, width, height) => {
-        // Ensure we received valid dimensions that don't match the whole screen
         if (width > 0 && height > 0) {
           setSpotlightLayouts((prev) => ({
             ...prev,
-            counters: { x, y, width, height },
             board: { x, y, width, height },
           }));
         }
@@ -83,7 +86,13 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     });
   }, []);
 
-  // Measure power-up action bar
+  const handleCountersLayout = useCallback((rect: LayoutRect) => {
+    setSpotlightLayouts((prev) => ({
+      ...prev,
+      counters: rect,
+    }));
+  }, []);
+
   const handleActionBarLayout = useCallback(() => {
     actionBarRef.current?.measureInWindow((x, y, width, height) => {
       if (width > 0 && height > 0) {
@@ -95,7 +104,6 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     });
   }, []);
 
-  // Check tutorial status whenever screen is focused or parameters change
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -127,6 +135,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
   const handleCloseTutorial = async () => {
     setShowTutorial(false);
     setHighlightedCellIndex(null);
+    setHighlightCounters(false);
     try {
       await AsyncStorage.setItem(TUTORIAL_STORAGE_KEY, "true");
     } catch (err) {
@@ -134,7 +143,6 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     }
   };
 
-  // Sync consumable token balances whenever screen receives focus
   const loadTokens = useCallback(async () => {
     try {
       const hintVal = await getEffectCount("extra-hints");
@@ -226,11 +234,10 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     }
   }, [daily, chapterId, levelId, navigation, themeIndex]);
 
-  const handleTileTapRequired = useCallback((taregtCellIndex: number) => {
-    setHighlightedCellIndex(taregtCellIndex);
+  const handleTileTapRequired = useCallback((targetCellIndex: number) => {
+    setHighlightedCellIndex(targetCellIndex);
   }, []);
 
-  // --- POWER-UP: HINT LOGIC ---
   const handleUseHint = async () => {
     if (hints <= 0) {
       Alert.alert(
@@ -254,7 +261,6 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
     }
   };
 
-  // --- POWER-UP: SKIP LOGIC ---
   const handleUseSkip = async () => {
     if (skipCount <= 0) {
       Alert.alert(
@@ -330,7 +336,6 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
       <View style={styles.boardContainer}>
         <View
           ref={boardWrapperRef}
-          onLayout={handleBoardLayout}
           style={styles.boardWrapper}
           collapsable={false}
         >
@@ -345,7 +350,10 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
             daily={daily}
             hintTrigger={hintTrigger}
             highlightCellIndex={highlightedCellIndex}
+            highlightCounters={highlightCounters}
             onGridChange={setCurrentGridState}
+            onBoardLayout={handleBoardLayout}
+            onCountersLayout={handleCountersLayout}
           />
         </View>
       </View>
@@ -392,6 +400,7 @@ export default function GameScreen({ route, navigation }: GameScreenProps) {
         onTileTapRequired={handleTileTapRequired}
         currentGridState={currentGridState}
         onHighlightCellChange={setHighlightedCellIndex}
+        onHighlightCountersChange={setHighlightCounters}
         layouts={spotlightLayouts}
       />
     </SafeAreaView>
@@ -455,7 +464,7 @@ const styles = StyleSheet.create({
   },
   boardWrapper: {
     alignSelf: "center",
-    flexGrow: 0, // Prevents expanding vertically in flex parent
+    flexGrow: 0,
   },
   actionBar: {
     flexDirection: "row",

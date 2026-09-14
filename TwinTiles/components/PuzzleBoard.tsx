@@ -43,6 +43,7 @@ export interface PuzzleBoardProps {
   highlightCellIndex?: number | number[] | null;
   highlightCounters?: boolean;
   onGridChange?: Dispatch<SetStateAction<number[]>>;
+  onBoardLayout?: (rect: { x: number; y: number; width: number; height: number }) => void;
   onCountersLayout?: (rect: { x: number; y: number; width: number; height: number }) => void;
   showControls?: boolean;
 }
@@ -54,8 +55,6 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
   function isValid(g: number[]): boolean {
     for (let r = 0; r < size; r++) {
       let r1 = 0, r2 = 0;
-      let consecutiveVal = 0;
-      let consecutiveCount = 0;
 
       for (let c = 0; c < size; c++) {
         const idx = r * size + c;
@@ -67,24 +66,20 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
         if (r1 > target || r2 > target) return false;
 
         if (val !== 0) {
-          if (val === consecutiveVal) {
-            consecutiveCount++;
-            if (consecutiveCount >= 3) return false;
-          } else {
-            consecutiveVal = val;
-            consecutiveCount = 1;
+          // Check contiguous 3-in-a-row horizontally across all offset configurations
+          if (c >= 2) {
+            const v1 = g[r * size + (c - 2)];
+            const v2 = g[r * size + (c - 1)];
+            if (val === v1 && val === v2 && !isVoid(r * size + (c - 2)) && !isVoid(r * size + (c - 1))) {
+              return false;
+            }
           }
-        } else {
-          consecutiveVal = 0;
-          consecutiveCount = 0;
         }
       }
     }
 
     for (let c = 0; c < size; c++) {
       let c1 = 0, c2 = 0;
-      let consecutiveVal = 0;
-      let consecutiveCount = 0;
 
       for (let r = 0; r < size; r++) {
         const idx = r * size + c;
@@ -96,16 +91,14 @@ function solvePuzzleGrid(initialGrid: number[], size: number, linkedPairs?: any[
         if (c1 > target || c2 > target) return false;
 
         if (val !== 0) {
-          if (val === consecutiveVal) {
-            consecutiveCount++;
-            if (consecutiveCount >= 3) return false;
-          } else {
-            consecutiveVal = val;
-            consecutiveCount = 1;
+          // Check contiguous 3-in-a-row vertically across all offset configurations
+          if (r >= 2) {
+            const v1 = g[(r - 2) * size + c];
+            const v2 = g[(r - 1) * size + c];
+            if (val === v1 && val === v2 && !isVoid((r - 2) * size + c) && !isVoid((r - 1) * size + c)) {
+              return false;
+            }
           }
-        } else {
-          consecutiveVal = 0;
-          consecutiveCount = 0;
         }
       }
     }
@@ -170,6 +163,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   highlightCellIndex = null,
   highlightCounters = false,
   onGridChange,
+  onBoardLayout,
   onCountersLayout,
   showControls = true,
 }) => {
@@ -194,17 +188,35 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   ]).current;
 
   const boardCardRef = useRef<View>(null);
+  const boardGridRef = useRef<View>(null);
+  const topCountersRef = useRef<View>(null);
+  const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleLayout = () => {
-    requestAnimationFrame(() => {
-      boardCardRef.current?.measureInWindow((x, y, width, height) => {
-        // Ensure values are within normal board bounds before dispatching layout
-        if (width > 0 && height > 0 && width < SCREEN_WIDTH) {
-          onCountersLayout?.({ x, y, width, height });
-        }
+  useEffect(() => {
+    return () => {
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    };
+  }, []);
+
+  const handleLayout = useCallback(() => {
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        boardGridRef.current?.measureInWindow((x, y, width, height) => {
+          if (width > 0 && height > 0 && onBoardLayout) {
+            onBoardLayout({ x, y, width, height });
+          }
+        });
+
+        topCountersRef.current?.measureInWindow((x, y, width, height) => {
+          if (width > 0 && height > 0 && onCountersLayout) {
+            onCountersLayout({ x, y, width, height });
+          }
+        });
       });
-    });
-  };
+    }, 50);
+  }, [onBoardLayout, onCountersLayout]);
 
   const updateGridState = useCallback((newGrid: number[]) => {
     setGrid(newGrid);
@@ -226,7 +238,7 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       if (type === "light") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (type === "medium") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (type === "success") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch { }
   };
 
   const refreshHints = useCallback(async () => {
@@ -247,38 +259,54 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     const isFilled = !currentGrid.some((val, i) => val === 0 && !isVoidIndex(i));
     if (!isFilled) return false;
 
+    const target = Math.floor(size / 2);
+
     for (let r = 0; r < size; r++) {
+      let ones = 0, twos = 0;
       let consecutiveVal = 0;
       let consecutiveCount = 0;
+
       for (let c = 0; c < size; c++) {
         const idx = r * size + c;
         if (isVoidIndex(idx)) continue;
         const val = currentGrid[idx];
-        if (val !== 0 && val === consecutiveVal) {
+
+        if (val === 1) ones++;
+        if (val === 2) twos++;
+
+        if (val === consecutiveVal) {
           consecutiveCount++;
           if (consecutiveCount >= 3) return false;
         } else {
           consecutiveVal = val;
-          consecutiveCount = val !== 0 ? 1 : 0;
+          consecutiveCount = 1;
         }
       }
+      if (ones !== target || twos !== target) return false;
     }
 
     for (let c = 0; c < size; c++) {
+      let ones = 0, twos = 0;
       let consecutiveVal = 0;
       let consecutiveCount = 0;
+
       for (let r = 0; r < size; r++) {
         const idx = r * size + c;
         if (isVoidIndex(idx)) continue;
         const val = currentGrid[idx];
-        if (val !== 0 && val === consecutiveVal) {
+
+        if (val === 1) ones++;
+        if (val === 2) twos++;
+
+        if (val === consecutiveVal) {
           consecutiveCount++;
           if (consecutiveCount >= 3) return false;
         } else {
           consecutiveVal = val;
-          consecutiveCount = val !== 0 ? 1 : 0;
+          consecutiveCount = 1;
         }
       }
+      if (ones !== target || twos !== target) return false;
     }
 
     if (levelData.linkedPairs && Array.isArray(levelData.linkedPairs)) {
@@ -369,7 +397,8 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       triggerHaptic("medium");
       playSound("hint");
       setErrorIndex(firstErrorIdx);
-      setTimeout(() => setErrorIndex(null), 2500);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = setTimeout(() => setErrorIndex(null), 2500);
       return;
     }
 
@@ -382,7 +411,8 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     setHintedIndex(firstEmptyIdx);
     setHintedValue(solutionGrid[firstEmptyIdx]);
 
-    setTimeout(() => {
+    if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+    hintTimeoutRef.current = setTimeout(() => {
       setHintedIndex(null);
       setHintedValue(null);
     }, 3000);
@@ -541,16 +571,27 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     const nextGrid = [...grid];
     nextGrid[index] = nextVal;
 
-    const partners = getLinkedPartners(index);
-    partners.forEach(({ partnerIdx, type }) => {
-      if (!isFixedIndex(partnerIdx) && !isVoidIndex(partnerIdx)) {
-        if (type === "opposite") {
-          nextGrid[partnerIdx] = nextVal === 1 ? 2 : nextVal === 2 ? 1 : 0;
-        } else {
-          nextGrid[partnerIdx] = nextVal;
+    const queue = [{ idx: index, val: nextVal }];
+    const visited = new Set<number>([index]);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const partners = getLinkedPartners(current.idx);
+
+      for (const { partnerIdx, type } of partners) {
+        if (visited.has(partnerIdx) || isFixedIndex(partnerIdx) || isVoidIndex(partnerIdx)) {
+          continue;
         }
+
+        visited.add(partnerIdx);
+        const partnerVal = type === "opposite"
+          ? (current.val === 1 ? 2 : current.val === 2 ? 1 : 0)
+          : current.val;
+
+        nextGrid[partnerIdx] = partnerVal;
+        queue.push({ idx: partnerIdx, val: partnerVal });
       }
-    });
+    }
 
     updateGridState(nextGrid);
     const newMoves = moves + 1;
@@ -595,108 +636,110 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         <Text style={styles.moveText}>MOVES: {moves}</Text>
       </View>
 
-      <View 
-        ref={boardCardRef} 
-        onLayout={handleLayout} 
-        collapsable={false} 
+      <View
+        ref={boardCardRef}
+        onLayout={handleLayout}
+        collapsable={false}
         style={styles.boardCard}
       >
-        {/* Top Column Counters */}
-        <View style={styles.columnCountersRow}>
-          {colCounts.map((col, cIdx) => (
-            <View
-              key={cIdx}
-              style={[
-                styles.colCounterBox,
-                { width: tileSize, marginHorizontal: TILE_MARGIN },
-                highlightCounters && styles.counterHighlighted,
-              ]}
-            >
-              <Text style={styles.counterText1}>{col.ones}/{targetPerType}</Text>
-              <Text style={styles.counterText2}>{col.twos}/{targetPerType}</Text>
+        <View ref={boardGridRef} collapsable={false}>
+          {/* Top Column Counters */}
+          <View ref={topCountersRef} collapsable={false} style={styles.columnCountersRow}>
+            {colCounts.map((col, cIdx) => (
+              <View
+                key={cIdx}
+                style={[
+                  styles.colCounterBox,
+                  { width: tileSize, marginHorizontal: TILE_MARGIN },
+                  highlightCounters && styles.counterHighlighted,
+                ]}
+              >
+                <Text style={styles.counterText1}>{col.ones}/{targetPerType}</Text>
+                <Text style={styles.counterText2}>{col.twos}/{targetPerType}</Text>
+              </View>
+            ))}
+            <View style={{ width: counterSize }} />
+          </View>
+
+          {/* Board Rows & Cell Links */}
+          {Array.from({ length: size }).map((_, rowIndex) => (
+            <View key={rowIndex} style={styles.boardRow}>
+              {Array.from({ length: size }).map((_, colIndex) => {
+                const idx = rowIndex * size + colIndex;
+                const val = grid[idx];
+                const isFixed = isFixedIndex(idx);
+                const isVoid = isVoidIndex(idx);
+
+                const rightLink = colIndex < size - 1 ? getLinkInfo(idx, idx + 1) : null;
+                const bottomLink = rowIndex < size - 1 ? getLinkInfo(idx, idx + size) : null;
+                const isCellHighlighted = isHighlightedCell(idx);
+
+                return (
+                  <View key={idx} style={{ position: "relative" }}>
+                    {isVoid ? (
+                      <View style={[styles.voidCell, { width: tileSize, height: tileSize, margin: TILE_MARGIN }]}>
+                        <Text style={styles.voidCellMark}>✕</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={isFixed || isWon ? 1 : 0.7}
+                        disabled={isFixed || isWon}
+                        onPress={() => handleTilePress(idx)}
+                        style={[
+                          styles.tile,
+                          { width: tileSize, height: tileSize, margin: TILE_MARGIN },
+                          val === 0 && styles.tileEmpty,
+                          val === 1 && styles.tileOne,
+                          val === 2 && styles.tileTwo,
+                          isFixed && styles.tileFixed,
+                          hintedIndex === idx && styles.tileHinted,
+                          errorIndex === idx && styles.tileError,
+                          isCellHighlighted && styles.tileRuleHighlight,
+                        ]}
+                      >
+                        {val !== 0 ? (
+                          <Text style={[styles.tileText, val === 1 ? styles.tileTextOne : styles.tileTextTwo]}>
+                            {val}
+                          </Text>
+                        ) : (
+                          hintedIndex === idx && hintedValue !== null && (
+                            <Text style={styles.hintGhostText}>
+                              {hintedValue}
+                            </Text>
+                          )
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {rightLink?.linked && (
+                      <View style={styles.rightLinkConnector}>
+                        <Text style={styles.linkSymbol}>{rightLink.type === "opposite" ? "≠" : "="}</Text>
+                      </View>
+                    )}
+
+                    {bottomLink?.linked && (
+                      <View style={styles.bottomLinkConnector}>
+                        <Text style={styles.linkSymbol}>{bottomLink.type === "opposite" ? "≠" : "="}</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+              {/* Row Counter Box */}
+              <View
+                style={[
+                  styles.rowCounterBox,
+                  { height: tileSize, width: counterSize, marginVertical: TILE_MARGIN },
+                  highlightCounters && styles.counterHighlighted,
+                ]}
+              >
+                <Text style={styles.counterText1}>{rowCounts[rowIndex].ones}/{targetPerType}</Text>
+                <Text style={styles.counterText2}>{rowCounts[rowIndex].twos}/{targetPerType}</Text>
+              </View>
             </View>
           ))}
-          <View style={{ width: counterSize }} />
         </View>
-
-        {/* Board Rows & Cell Links */}
-        {Array.from({ length: size }).map((_, rowIndex) => (
-          <View key={rowIndex} style={styles.boardRow}>
-            {Array.from({ length: size }).map((_, colIndex) => {
-              const idx = rowIndex * size + colIndex;
-              const val = grid[idx];
-              const isFixed = isFixedIndex(idx);
-              const isVoid = isVoidIndex(idx);
-
-              const rightLink = colIndex < size - 1 ? getLinkInfo(idx, idx + 1) : null;
-              const bottomLink = rowIndex < size - 1 ? getLinkInfo(idx, idx + size) : null;
-              const isCellHighlighted = isHighlightedCell(idx);
-
-              return (
-                <View key={idx} style={{ position: "relative" }}>
-                  {isVoid ? (
-                    <View style={[styles.voidCell, { width: tileSize, height: tileSize, margin: TILE_MARGIN }]}>
-                      <Text style={styles.voidCellMark}>✕</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      activeOpacity={isFixed || isWon ? 1 : 0.7}
-                      disabled={isFixed || isWon}
-                      onPress={() => handleTilePress(idx)}
-                      style={[
-                        styles.tile,
-                        { width: tileSize, height: tileSize, margin: TILE_MARGIN },
-                        val === 0 && styles.tileEmpty,
-                        val === 1 && styles.tileOne,
-                        val === 2 && styles.tileTwo,
-                        isFixed && styles.tileFixed,
-                        hintedIndex === idx && styles.tileHinted,
-                        errorIndex === idx && styles.tileError,
-                        isCellHighlighted && styles.tileRuleHighlight,
-                      ]}
-                    >
-                      {val !== 0 ? (
-                        <Text style={[styles.tileText, val === 1 ? styles.tileTextOne : styles.tileTextTwo]}>
-                          {val}
-                        </Text>
-                      ) : (
-                        hintedIndex === idx && hintedValue !== null && (
-                          <Text style={styles.hintGhostText}>
-                            {hintedValue}
-                          </Text>
-                        )
-                      )}
-                    </TouchableOpacity>
-                  )}
-
-                  {rightLink?.linked && (
-                    <View style={styles.rightLinkConnector}>
-                      <Text style={styles.linkSymbol}>{rightLink.type === "opposite" ? "≠" : "="}</Text>
-                    </View>
-                  )}
-
-                  {bottomLink?.linked && (
-                    <View style={styles.bottomLinkConnector}>
-                      <Text style={styles.linkSymbol}>{bottomLink.type === "opposite" ? "≠" : "="}</Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-
-            {/* Row Counter Box */}
-            <View
-              style={[
-                styles.rowCounterBox,
-                { height: tileSize, width: counterSize, marginVertical: TILE_MARGIN },
-                highlightCounters && styles.counterHighlighted,
-              ]}
-            >
-              <Text style={styles.counterText1}>{rowCounts[rowIndex].ones}/{targetPerType}</Text>
-              <Text style={styles.counterText2}>{rowCounts[rowIndex].twos}/{targetPerType}</Text>
-            </View>
-          </View>
-        ))}
       </View>
 
       {/* Control Buttons */}
@@ -973,12 +1016,9 @@ const makeStyles = (uiTheme: UITheme) =>
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
       borderRadius: radii.md,
-      width: "100%",
-      alignItems: "center",
     },
     nextButtonText: {
-      ...typography.body,
+      ...typography.button,
       color: uiTheme.onPrimary,
-      fontWeight: "700",
     },
   });
