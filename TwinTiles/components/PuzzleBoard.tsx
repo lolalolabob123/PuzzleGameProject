@@ -200,18 +200,18 @@ export const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     };
   }, []);
 
-  const handleLayout = useCallback(() => {
+const handleLayout = useCallback(() => {
     setTimeout(() => {
       requestAnimationFrame(() => {
-        boardGridRef.current?.measureInWindow((x, y, width, height) => {
+        boardGridRef.current?.measure((x, y, width, height, pageX, pageY) => {
           if (width > 0 && height > 0 && onBoardLayout) {
-            onBoardLayout({ x, y, width, height });
+            onBoardLayout({ x: pageX, y: pageY, width, height });
           }
         });
 
-        topCountersRef.current?.measureInWindow((x, y, width, height) => {
+        topCountersRef.current?.measure((x, y, width, height, pageX, pageY) => {
           if (width > 0 && height > 0 && onCountersLayout) {
-            onCountersLayout({ x, y, width, height });
+            onCountersLayout({ x: pageX, y: pageY, width, height });
           }
         });
       });

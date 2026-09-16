@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Platform, View, StyleSheet, StatusBar } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -6,6 +6,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
+import * as ExpoIap from "expo-iap";
+import { addCoins } from "./utils/coins";
 
 // Contexts & Providers
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -96,6 +98,58 @@ function MainNavigator() {
   useEffect(() => {
     initAudio();
     initHaptics();
+  }, []);
+
+  useEffect(() => {
+    initAudio();
+    initHaptics();
+
+    const initTapConnection = async () => {
+      try {
+        await ExpoIap.initConnection();
+      } catch (err) {
+        console.warn("IAP connection error", err);
+      }
+    };
+
+    initTapConnection();
+
+    // Global listener for succesful purchases across the app
+    const purchaseUpdateSubscription = ExpoIap.purchaseUpdatedListener(
+      async (purchase: any) => {
+        const receipt = purchase.transactionReciepts;
+        if (receipt) {
+          try {
+            // Acknowledge/finish the transaction with the store
+            await ExpoIap.finishTransaction({ purchase, isConsumable: true });
+
+            // Reward the user based on which pack ID was purchased
+            let coinReward = 0;
+            if (purchase.productId.includes("small")) coinReward = 100;
+            else if (purchase.productId.includes("medium")) coinReward = 500;
+            else if (purchase.productId.includes("large")) coinReward = 1000;
+
+            if (coinReward > 0) {
+              await addCoins(coinReward);
+            }
+          } catch (ackError) {
+            console.warn("Failed to finish transaction", ackError);
+          }
+        }
+      }
+    );
+
+    const purchaseErrorSubscription = ExpoIap.purchaseErrorListener(
+      (error: any) => {
+        console.warn("Purchase Error:", error);
+      }
+    );
+
+    return () => {
+      purchaseErrorSubscription.remove();
+      purchaseErrorSubscription.remove();
+      ExpoIap.endConnection();
+    };
   }, []);
 
   return (

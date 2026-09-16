@@ -79,7 +79,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     instruction: "Use these starting tiles as anchors to deduce surrounding colors.",
     type: "info",
     highlightArea: "board",
-    highlightCells: [0, 2],
+    highlightCells: [0, 2, 3, 5, 8, 10, 12, 15],
     highlightCounters: false,
   },
   {

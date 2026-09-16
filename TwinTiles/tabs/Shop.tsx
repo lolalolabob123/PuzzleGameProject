@@ -38,6 +38,7 @@ import {
   ShopItem,
   ShopItemCategory,
 } from "../data/shopItems";
+import * as ExpoIap from 'expo-iap';
 
 const SECTION_TITLES: Record<ShopItemCategory, string> = {
   theme: "Themes",
@@ -113,10 +114,24 @@ export default function Shop() {
   };
 
   const handleBuyCoins = async (pack: CoinPack) => {
-    await addCoins(pack.amount);
-    await refresh();
-    setCoinModalVisible(false);
-    universalNotify("Coins added", `+${pack.amount} coins`);
+    try {
+      const sku = Platform.select({
+        ios: `com.yourname.twintiles.coins.${pack.id}`,
+        android: `coins_${pack.id}`,
+      });
+
+      if (!sku) return;
+
+      await (ExpoIap.requestPurchase as any) ({
+        sku,
+      });
+
+    } catch (error: any) {
+      if (error.code === 'E_USER_CANCELLED') {
+        return;
+      }
+      universalNotify("Purchase Failed", error.message || "Could not complete the purchase.");
+    }
   };
 
   const { width: windowWidth } = useWindowDimensions();
