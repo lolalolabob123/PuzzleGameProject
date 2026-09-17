@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -83,6 +83,59 @@ export default function Shop() {
     }, [refresh])
   );
 
+  // Initialize and clean up expo-iap connection and purchase listeners
+  useEffect(() => {
+    let purchaseUpdateSubscription: any;
+    let purchaseErrorSubscription: any;
+
+    async function initIap() {
+      try {
+        await ExpoIap.initConnection();
+
+        purchaseUpdateSubscription = ExpoIap.purchaseUpdatedListener(async (purchase: any) => {
+          const receipt = purchase.transactionReceipt;
+          if (receipt) {
+            try {
+              // Finish transaction to acknowledge the purchase
+              await ExpoIap.finishTransaction({ purchase, isConsumable: true });
+
+              // Match SKU/productId back to coin amount and credit user
+              const matchedPack = COIN_PACKS.find(
+                (p) =>
+                  purchase.productId === `com.yourname.twintiles.coins.${p.id}` ||
+                  purchase.productId === `coins_${p.id}`
+              );
+
+              if (matchedPack) {
+                await addCoins(matchedPack.amount);
+                await refresh();
+                universalNotify("Success!", `You received ${matchedPack.amount} coins!`);
+              }
+            } catch (ackError: any) {
+              console.warn("Failed to finish transaction", ackError);
+            }
+          }
+        });
+
+        purchaseErrorSubscription = ExpoIap.purchaseErrorListener((error: any) => {
+          if (error.code !== 'E_USER_CANCELLED') {
+            universalNotify("Purchase Error", error.message || "An error occurred during purchase.");
+          }
+        });
+      } catch (err) {
+        console.warn("IAP initialization error:", err);
+      }
+    }
+
+    initIap();
+
+    return () => {
+      purchaseUpdateSubscription?.remove();
+      purchaseErrorSubscription?.remove();
+      ExpoIap.endConnection();
+    };
+  }, [refresh]);
+
   const universalNotify = (title: string, message: string) => {
     Platform.OS === "web"
       ? window.alert(message)
@@ -113,21 +166,28 @@ export default function Shop() {
     universalNotify("Purchased", `You bought ${item.name}.`);
   };
 
-  const handleBuyCoins = async (pack: CoinPack) => {
+const handleBuyCoins = async (pack: CoinPack) => {
     try {
-      const sku = Platform.select({
+      const productId = Platform.select({
         ios: `com.yourname.twintiles.coins.${pack.id}`,
         android: `coins_${pack.id}`,
       });
 
-      if (!sku) return;
+      if (!productId) return;
 
-      await (ExpoIap.requestPurchase as any) ({
-        sku,
+      await ExpoIap.requestPurchase({
+        request: {
+          apple: {
+            sku: productId,
+          },
+          google: {
+            skus: [productId],
+          },
+        },
+        type: "in-app",
       });
-
     } catch (error: any) {
-      if (error.code === 'E_USER_CANCELLED') {
+      if (error.code === 'user-cancelled' || error.code === 'E_USER_CANCELLED') {
         return;
       }
       universalNotify("Purchase Failed", error.message || "Could not complete the purchase.");
