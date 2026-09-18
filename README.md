@@ -245,13 +245,5 @@ Developing TwinTiles provided practical experience with:
 
 ---
 
-## 🔗 Links
-
-**Live Demo:**
-https://phenomenal-basbousa-07227.netlify.app/
-
-**Repository:**
-https://github.com/lolalolabob123/TwinTiles
-
 **Developer:**
 Callum Candy
