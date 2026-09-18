@@ -157,8 +157,8 @@ The exact structure may change as the project develops, but the application sepa
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/lolalolabob123/PuzzleGameProject.git
-cd PuzzleGameProject
+git clone https://github.com/lolalolabob123/TwinTiles.git
+cd TwinTiles
 ```
 
 ### 2. Install dependencies
