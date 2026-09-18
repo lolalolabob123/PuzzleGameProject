@@ -251,7 +251,7 @@ Developing TwinTiles provided practical experience with:
 https://phenomenal-basbousa-07227.netlify.app/
 
 **Repository:**
-https://github.com/lolalolabob123/PuzzleGameProject
+https://github.com/lolalolabob123/TwinTiles
 
 **Developer:**
 Callum Candy
