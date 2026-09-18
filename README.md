@@ -2,7 +2,7 @@
 
 **Cross-platform puzzle game built with React Native, Expo and TypeScript.**
 
-TwinTiles is a grid-based puzzle game where players complete increasingly challenging levels while following a set of logical constraints. The project was developed as a substantial application project, with a focus on reusable React components, game-state management, custom validation logic, persistent player progress and cross-platform deployment.
+TwinTiles is a grid-based puzzle game where players complete increasingly challenging levels while following a set of logical constraints. The project focuses on reusable React components, game-state management, custom validation logic, persistent player progress and cross-platform deployment.
 
 ## 📸 Showcase
 
